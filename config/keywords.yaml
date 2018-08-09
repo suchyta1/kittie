@@ -1,0 +1,19 @@
+# Job properties
+jobname: jobname    # Name of the job
+rundir: rundir      # Where the job area is going to be written
+walltime: walltime  # Walltime limit for job
+
+
+# Machine properties -- Probably need reilated things to this
+machine: machine    # Info about the system where you're running
+
+
+# Copying type parameters
+copy: copy                      # Hard copying -- Directories copy as a single entity into the target
+copycontents: copy-contents     # Hard copying -- Contents of directories copy, not the single top directory as an entity
+link: link                      # Make symboloic link
+
+
+# Setup type parameters
+pre-sub-cmds: pre-submit-commands  # Commands that run before submitting the job, to set up up the working area
+
