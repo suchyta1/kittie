@@ -17,3 +17,5 @@ link: link                      # Make symboloic link
 # Setup type parameters
 pre-sub-cmds: pre-submit-commands  # Commands that run before submitting the job, to set up up the working area
 
+
+file-edit: file-edit
