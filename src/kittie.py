@@ -39,7 +39,7 @@ class KittieJob(cheetah.Campaign):
         """
 
         filepath = os.path.realpath(__file__)
-        dirname = os.path.dirname(filepath)
+        dirname = os.path.dirname(os.path.dirname(filepath))
         keywordspath = os.path.join(dirname, "config", "keywords.yaml")
 
         with open(keywordspath, 'r') as ystream:

@@ -1,2 +1,4 @@
 *.log
 runs/
+build/
+install/
