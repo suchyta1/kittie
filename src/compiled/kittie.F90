@@ -1,12 +1,20 @@
-module adios2_coupling_base
-	use mpi
-	use adios2
+module kittie
+	use kittie_internal
 
 	implicit none
 
-	character(len=8), parameter :: writing=".writing"
-	character(len=8), parameter :: reading=".reading"
-	integer :: iounit=20
+
+    interface kittie_put
+        module procedure kittie_put_real_8_1
+        module procedure kittie_put_real_8_2
+        module procedure kittie_put_real_4_2
+    end interface kittie_put
+
+
+    interface kittie_get_selection
+        module procedure kittie_get_selection_8_1
+        module procedure kittie_get_selection_8_2
+    end interface kittie_get_selection
 
 
 	type coupling_helper
@@ -23,46 +31,6 @@ module adios2_coupling_base
 
 
 	contains
-
-		function string_copy(thing) result(new)
-			character(len=*), intent(in) :: thing
-			character(len=:), allocatable :: new
-			allocate(character(len_trim(thing)) :: new)
-			new = thing
-		end function string_copy
-
-
-		function capitalize(strIn) result(strOut)
-			character(len=*), intent(in) :: strIn
-			character(len=:), allocatable :: strOut
-			integer :: i,j
-
-			strOut = string_copy(strIn)
-			do i = 1, len(strOut)
-				j = iachar(strIn(i:i))
-				if (j>= iachar("a") .and. j<=iachar("z") ) then
-					strOut(i:i) = achar(iachar(strIn(i:i))-32)
-				else
-					strOut(i:i) = strIn(i:i)
-				end if
-			end do
-		end function capitalize
-
-
-		subroutine delete_existing(fname)
-			character(len=*), intent(in) :: fname
-			integer :: stat
-			open(unit=iounit, iostat=stat, file=fname, status='old')
-			close(iounit, status="delete")
-		end subroutine delete_existing
-
-
-		subroutine touch_file(fname)
-			character(len=*), intent(in) :: fname
-			open(unit=iounit, file=fname, status='new')
-			close(iounit)
-		end subroutine touch_file
-
 
 		subroutine until_nonexistent(helper)
 			type(coupling_helper), intent(in) :: helper
@@ -122,26 +90,28 @@ module adios2_coupling_base
 		subroutine lock_state(helper, yes)
 			type(coupling_helper), intent(in) :: helper
 			logical, intent(in) :: yes
-
 			integer :: ierr, rank, stat
 
-			if (.not. yes) then
+			if (use_mpi .and. (.not. yes))  then
 				call mpi_barrier(helper%comm, ierr)
 			end if
 
-			call mpi_comm_rank(helper%comm, rank, ierr)
-			if (rank == 0) then
+			if (use_mpi) then
+				call mpi_comm_rank(helper%comm, rank, ierr)
+			endif
+
+			if ((.not.use_mpi) .or. (rank == 0)) then
 				call lock_logic(helper, yes)
 			end if
 
-			if (yes) then
+			if (use_mpi .and. yes) then
 				call mpi_barrier(helper%comm, ierr)
 			end if
 
 		end subroutine lock_state
 
 
-		subroutine adios2_couple_end_step(helper, ierr)
+		subroutine kittie_couple_end_step(helper, ierr)
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(out) :: ierr
 
@@ -160,21 +130,15 @@ module adios2_coupling_base
 				end if
 			end if
 
-		end subroutine adios2_couple_end_step
+		end subroutine kittie_couple_end_step
 
 
 		function which_engine(io) result(res)
 			type(adios2_io), intent(in) :: io
 			integer :: ierr
 			character(:), allocatable :: res
-			!character(:), allocatable :: engine_type
-
-			!call adios2_io_engine_type(io, engine_type, ierr)
-			!res = capitalize(engine_type)
-			!deallocate(engine_type)
 
 			res = capitalize(io%engine_type)
-
 		end function which_engine
 
 
@@ -201,7 +165,13 @@ module adios2_coupling_base
 			found = .false.
 			current_step = -1
 			call lock_state(helper, .true.)
-			call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
+
+#			ifdef USE_MPI
+				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
+#			else
+				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, ierr)
+#			endif
+
 
 			do while (.true.)
 				call adios2_begin_step(helper%engine, adios2_step_mode_next_available, ierr)
@@ -230,45 +200,165 @@ module adios2_coupling_base
 		end subroutine file_seek
 
 
-		subroutine adios2_couple_open(helper)
+		subroutine kittie_couple_open(helper)
 			type(coupling_helper), intent(inout) :: helper
 			integer :: ierr
 			if (helper%usesfile) then
 				call lock_state(helper, .true.)
 			end if
-			call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
+
+#			ifdef USE_MPI
+				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
+#			else
+				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, ierr)
+#			endif
+
 			if (helper%usesfile) then
 				call lock_state(helper, .false.)
 			end if
-		end subroutine adios2_couple_open
+		end subroutine kittie_couple_open
 
 
-		! Roughly the idea is "push/fetch the step I want, without me having to worry about how I do that in a safe way for different types of I/O".
-		! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
-		subroutine adios2_couple_start(helper, fname, io, mode, comm, step, dir, hint)
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		! Start of new things that I'm adding
+		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-			! This is intent(inout) for a reason that isn't super important, but someone might want. 
-			! I copy back the helper%io that gets set into the argument io
-			type(adios2_io), intent(inout) :: io
+#		ifdef USE_MPI
+
+			subroutine kittie_initialize(comm, ierr)
+				! Intialize Kittie's ADIOS-2 namespace
+				integer, intent(in)  :: comm
+				integer, intent(out) :: ierr
+				call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
+			end subroutine kittie_initialize
+
+#		else
+
+			subroutine kittie_initialize(ierr)
+				! Intialize Kittie's ADIOS-2 namespace
+				integer, intent(out) :: ierr
+				call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+			end subroutine kittie_initialize
+
+#		endif
+
+
+		subroutine kittie_declare_io(groupname, ierr)
+			! Initialize a new Kittie coupling I/O group
+
+			character(len=*), intent(in) :: groupname
+			integer, intent(out) :: ierr
+			type(adios2_io) :: io
+
+			call adios2_declare_io(io, kittie_adios, groupname, ierr)
+
+		end subroutine kittie_declare_io
+
+
+		subroutine kittie_define_variable(groupname, varname, dtype, ndims, global_dims, global_offsets, local_dims, ierr, constant_dims)
+			! At least for now, it makes sense to basically use the ADIOS-2 API
+
+			character(len=*), intent(in) :: groupname
+			character(len=*), intent(in) :: varname
+			integer, intent(in)  :: dtype
+			integer, intent(in)  :: ndims
+			integer(kind=8), dimension(:), intent(in) :: global_dims
+			integer(kind=8), dimension(:), intent(in) :: global_offsets
+			integer(kind=8), dimension(:), intent(in) :: local_dims
+			integer, intent(out) :: ierr
+			logical, intent(in), optional :: constant_dims
+
+			type(adios2_variable) :: varid
+			type(adios2_io)       :: io
+
+			call adios2_at_io(io, kittie_adios, groupname, ierr)
+			if (present(constant_dims)) then
+				call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, constant_dims, ierr)
+			else
+				call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, adios2_constant_dims, ierr)
+			end if
+
+		end subroutine kittie_define_variable
+
+
+		function kittie_inquire_variable(helper, varname, ierr) result(varid)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			call adios2_inquire_variable(varid, helper%io, varname, ierr)
+		end function kittie_inquire_variable
+
+
+		function kittie_set_selection(helper, varname, ndim, starts, counts, ierr) result(varid)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_inquire_variable(helper, varname, ierr)
+			call adios2_set_selection(varid, ndim, starts, counts, ierr)
+		end function kittie_set_selection
+
+
+		subroutine kittie_get_selection_8_1(outdata, helper, varname, ndim, starts, counts, ierr)
+			real(kind=8), intent(out), dimension(:) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_8_1
+
+
+		subroutine kittie_get_selection_8_2(outdata, helper, varname, ndim, starts, counts, ierr)
+			real(kind=8), intent(out), dimension(:, :) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_8_2
+
+
+		subroutine kittie_couple_start(helper, filename, groupname, mode, comm, step, ierr, dir)
+			! Roughly the idea is push/fetch the given step, without worrying about how to do safely for different types of I/O.
+			! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
 
 			type(coupling_helper), intent(inout) :: helper
-			character(len=*), intent(in) :: fname
-			integer, intent(in) :: mode, comm
-			character(len=*), intent(in), optional :: dir, hint
-			integer, intent(in), optional :: step
-
+			character(len=*), intent(in) :: filename
+			character(len=*), intent(in) :: groupname
+			integer, intent(in) :: mode
+			integer, intent(in),  optional :: comm
+			integer, intent(in),  optional :: step
+			integer, intent(out), optional :: ierr
+			character(len=*), intent(in), optional :: dir
+			type(adios2_io) :: io
 			type(adios2_engine) :: engine
-			integer :: ierr
+			integer :: iierr
+
+			call adios2_at_io(io, kittie_adios, groupname, iierr)
 
 			if (.not.helper%alive) then
-				helper%comm = comm
+				
+				if (present(comm)) then
+					helper%comm = comm
+				endif
+
 				helper%engine_type = which_engine(io)
 				helper%usesfile = uses_files(helper%engine_type)
 				helper%mode = mode
 				if (present(dir)) then
-					helper%filename = string_copy(trim(dir)//"/"//trim(fname))
+					helper%filename = string_copy(trim(dir)//"/"//trim(filename))
 				else
-					helper%filename = string_copy(trim(fname))
+					helper%filename = string_copy(trim(filename))
 				end if
 			end if
 
@@ -279,9 +369,9 @@ module adios2_coupling_base
 
 			if (helper%mode == adios2_mode_write) then
 				if (.not.helper%alive) then
-					call adios2_couple_open(helper)
+					call kittie_couple_open(helper)
 				end if
-				call adios2_begin_step(helper%engine, adios2_step_mode_append, ierr)
+				call adios2_begin_step(helper%engine, adios2_step_mode_append, iierr)
 
 			else if (helper%mode == adios2_mode_read) then
 				if (helper%usesfile) then
@@ -292,17 +382,46 @@ module adios2_coupling_base
 					call file_seek(helper, step)
 				else
 					if (.not.helper%alive) then
-						call adios2_couple_open(helper)
+						call kittie_couple_open(helper)
 					end if
-					call adios2_begin_step(helper%engine, adios2_step_mode_next_available, ierr)
+					call adios2_begin_step(helper%engine, adios2_step_mode_next_available, iierr)
 				end if
 
 			end if
 
 			helper%alive = .true.
-			io = helper%io
-		end subroutine adios2_couple_start
+			if (present(ierr)) then
+				ierr = iierr
+			end if
+
+		end subroutine kittie_couple_start
 
 
-end module adios2_coupling_base
+		subroutine kittie_put_real_8_1(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=8), dimension(:), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8_1
+
+
+		subroutine kittie_put_real_8_2(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=8), dimension(:, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8_2
+
+
+		subroutine kittie_put_real_4_2(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=4), dimension(:, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_4_2
+
+end module kittie
 
