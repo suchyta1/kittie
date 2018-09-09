@@ -147,7 +147,7 @@ module kittie
 			integer :: ierr
 			logical :: res
 
-			if ((engine_type == 'BPFILE') .or. (engine_type == 'HDF5')) then
+			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'HDF5')) then
 				res = .true.
 			else
 				res = .false.
@@ -225,19 +225,35 @@ module kittie
 
 #		ifdef USE_MPI
 
-			subroutine kittie_initialize(comm, ierr)
+			subroutine kittie_initialize(comm, ierr, xml)
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(in)  :: comm
 				integer, intent(out) :: ierr
-				call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
+				character(len=*), intent(in), optional :: xml
+
+
+				character(len=512) :: eng
+				type(adios2_io) :: io
+
+
+				if (present(xml)) then
+					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, ierr)
+				else
+					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
+				end if
 			end subroutine kittie_initialize
 
 #		else
 
-			subroutine kittie_initialize(ierr)
+			subroutine kittie_initialize(ierr, xml)
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(out) :: ierr
-				call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+				character(len=*), intent(in), optional :: xmll
+				if (present(xml)) then
+					call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
+				else
+					call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+				end if
 			end subroutine kittie_initialize
 
 #		endif
@@ -250,8 +266,8 @@ module kittie
 			integer, intent(out) :: ierr
 			type(adios2_io) :: io
 
-			call adios2_declare_io(io, kittie_adios, groupname, ierr)
-
+			call adios2_declare_io(io, kittie_adios, trim(groupname), ierr)
+			!call adios2_set_engine(io, "SST", ierr)
 		end subroutine kittie_declare_io
 
 
@@ -271,7 +287,9 @@ module kittie
 			type(adios2_variable) :: varid
 			type(adios2_io)       :: io
 
-			call adios2_at_io(io, kittie_adios, groupname, ierr)
+			call adios2_at_io(io, kittie_adios, trim(groupname), ierr)
+			!call adios2_set_engine(io, "SST", ierr)
+
 			if (present(constant_dims)) then
 				call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, constant_dims, ierr)
 			else
@@ -344,7 +362,8 @@ module kittie
 			type(adios2_engine) :: engine
 			integer :: iierr
 
-			call adios2_at_io(io, kittie_adios, groupname, iierr)
+			call adios2_at_io(io, kittie_adios, trim(groupname), iierr)
+			!call adios2_set_engine(io, "SST", iierr)
 
 			if (.not.helper%alive) then
 				
@@ -354,6 +373,7 @@ module kittie
 
 				helper%engine_type = which_engine(io)
 				helper%usesfile = uses_files(helper%engine_type)
+
 				helper%mode = mode
 				if (present(dir)) then
 					helper%filename = string_copy(trim(dir)//"/"//trim(filename))
