@@ -7,14 +7,30 @@ module kittie
     interface kittie_put
         module procedure kittie_put_real_8_1
         module procedure kittie_put_real_8_2
+        module procedure kittie_put_real_8_3
+        module procedure kittie_put_real_8_4
         module procedure kittie_put_real_4_2
+        module procedure kittie_put_complex_8_6
+        module procedure kittie_put_real_8_6
+        module procedure kittie_put_integer
+        module procedure kittie_put_real_8
     end interface kittie_put
 
 
     interface kittie_get_selection
-        module procedure kittie_get_selection_8_1
-        module procedure kittie_get_selection_8_2
+        module procedure kittie_get_selection_integer_1
+        module procedure kittie_get_selection_real_8_1
+        module procedure kittie_get_selection_real_8_2
+        module procedure kittie_get_selection_real_8_4
+        module procedure kittie_get_selection_complex_8_6
+        module procedure kittie_get_selection_real_8_6
     end interface kittie_get_selection
+
+
+    interface kittie_get
+        module procedure kittie_get_integer
+        module procedure kittie_get_real_8
+    end interface kittie_get
 
 
 	type coupling_helper
@@ -111,9 +127,10 @@ module kittie
 		end subroutine lock_state
 
 
-		subroutine kittie_couple_end_step(helper, ierr)
+		subroutine kittie_couple_end_step(helper, ierr, time, lock_print)
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(out) :: ierr
+			logical, intent(in), optional :: time, lock_print
 
 			if (helper%usesfile) then
 				call lock_state(helper, .true.)
@@ -124,6 +141,7 @@ module kittie
 
 			if (helper%usesfile) then
 				call lock_state(helper, .false.)
+
 				if (helper%mode == adios2_mode_read) then
 					call adios2_close(helper%engine, ierr)
 					call adios2_remove_all_variables(helper%io, ierr)
@@ -147,7 +165,7 @@ module kittie
 			integer :: ierr
 			logical :: res
 
-			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'HDF5')) then
+			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'BP') .or. (trim(engine_type) == 'HDF5')) then
 				res = .true.
 			else
 				res = .false.
@@ -203,6 +221,7 @@ module kittie
 		subroutine kittie_couple_open(helper)
 			type(coupling_helper), intent(inout) :: helper
 			integer :: ierr
+
 			if (helper%usesfile) then
 				call lock_state(helper, .true.)
 			end if
@@ -278,22 +297,31 @@ module kittie
 			character(len=*), intent(in) :: varname
 			integer, intent(in)  :: dtype
 			integer, intent(in)  :: ndims
-			integer(kind=8), dimension(:), intent(in) :: global_dims
-			integer(kind=8), dimension(:), intent(in) :: global_offsets
-			integer(kind=8), dimension(:), intent(in) :: local_dims
-			integer, intent(out) :: ierr
+			integer(kind=8), dimension(:), intent(in), optional :: global_dims
+			integer(kind=8), dimension(:), intent(in), optional :: global_offsets
+			integer(kind=8), dimension(:), intent(in), optional :: local_dims
+			integer, intent(out), optional :: ierr
 			logical, intent(in), optional :: constant_dims
 
+			integer :: err
 			type(adios2_variable) :: varid
 			type(adios2_io)       :: io
 
-			call adios2_at_io(io, kittie_adios, trim(groupname), ierr)
+			call adios2_at_io(io, kittie_adios, trim(groupname), err)
 			!call adios2_set_engine(io, "SST", ierr)
 
-			if (present(constant_dims)) then
-				call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, constant_dims, ierr)
+			if (present(global_dims)) then
+				if (present(constant_dims)) then
+					call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, constant_dims, err)
+				else
+					call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, adios2_constant_dims, err)
+				end if
 			else
-				call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, adios2_constant_dims, ierr)
+				call adios2_define_variable(varid, io, varname, dtype, err)
+			end if
+
+			if (present(ierr)) then
+				ierr = err
 			end if
 
 		end subroutine kittie_define_variable
@@ -320,7 +348,20 @@ module kittie
 		end function kittie_set_selection
 
 
-		subroutine kittie_get_selection_8_1(outdata, helper, varname, ndim, starts, counts, ierr)
+		subroutine kittie_get_selection_integer_1(outdata, helper, varname, ndim, starts, counts, ierr)
+			integer, intent(out), dimension(:) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_integer_1
+
+
+		subroutine kittie_get_selection_real_8_1(outdata, helper, varname, ndim, starts, counts, ierr)
 			real(kind=8), intent(out), dimension(:) :: outdata
 			type(coupling_helper), intent(in) :: helper
 			character(len=*), intent(in) :: varname
@@ -330,10 +371,10 @@ module kittie
 			type(adios2_variable) :: varid
 			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
 			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
-		end subroutine kittie_get_selection_8_1
+		end subroutine kittie_get_selection_real_8_1
 
 
-		subroutine kittie_get_selection_8_2(outdata, helper, varname, ndim, starts, counts, ierr)
+		subroutine kittie_get_selection_real_8_2(outdata, helper, varname, ndim, starts, counts, ierr)
 			real(kind=8), intent(out), dimension(:, :) :: outdata
 			type(coupling_helper), intent(in) :: helper
 			character(len=*), intent(in) :: varname
@@ -343,7 +384,64 @@ module kittie
 			type(adios2_variable) :: varid
 			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
 			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
-		end subroutine kittie_get_selection_8_2
+		end subroutine kittie_get_selection_real_8_2
+		
+		
+		subroutine kittie_get_selection_real_8_4(outdata, helper, varname, ndim, starts, counts, ierr)
+			real(kind=8), intent(out), dimension(:, :, :, :) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_real_8_4
+
+
+		subroutine kittie_get_selection_complex_8_6(outdata, helper, varname, ndim, starts, counts, ierr)
+			complex(kind=8), intent(out), dimension(:, :, :, :, :, :) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_complex_8_6
+
+
+		subroutine kittie_get_selection_real_8_6(outdata, helper, varname, ndim, starts, counts, ierr)
+			real(kind=8), intent(out), dimension(:, :, :, :, :, :) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(ndim), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_real_8_6
+
+
+		subroutine kittie_get_integer(outdata, helper, varname, ierr)
+			integer, intent(out) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(out) :: ierr
+			call adios2_get(helper%engine, trim(varname), outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_integer
+		
+
+		subroutine kittie_get_real_8(outdata, helper, varname, ierr)
+			real(8), intent(out) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(out) :: ierr
+			call adios2_get(helper%engine, trim(varname), outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_real_8
 
 
 		subroutine kittie_couple_start(helper, filename, groupname, mode, comm, step, ierr, dir)
@@ -394,11 +492,13 @@ module kittie
 				call adios2_begin_step(helper%engine, adios2_step_mode_append, iierr)
 
 			else if (helper%mode == adios2_mode_read) then
+
 				if (helper%usesfile) then
 					if (.not.present(step)) then
 						write (*, "('If reading from file for coupling, must give what step you want to read from')")
 						stop
 					end if
+
 					call file_seek(helper, step)
 				else
 					if (.not.helper%alive) then
@@ -415,6 +515,24 @@ module kittie
 			end if
 
 		end subroutine kittie_couple_start
+
+
+		subroutine kittie_put_real_8(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(8), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8
+
+
+		subroutine kittie_put_integer(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_integer
 
 
 		subroutine kittie_put_real_8_1(helper, varname, outdata, ierr)
@@ -435,6 +553,24 @@ module kittie
 		end subroutine kittie_put_real_8_2
 
 
+		subroutine kittie_put_real_8_3(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=8), dimension(:, :, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8_3
+
+
+		subroutine kittie_put_real_8_4(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=8), dimension(:, :, :, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8_4
+
+
 		subroutine kittie_put_real_4_2(helper, varname, outdata, ierr)
 			type(coupling_helper), intent(in) :: helper
 			character(len=*), intent(in) :: varname
@@ -442,6 +578,23 @@ module kittie
 			integer, intent(out) :: ierr
 			call adios2_put(helper%engine, varname, outdata, ierr)
 		end subroutine kittie_put_real_4_2
+
+
+		subroutine kittie_put_complex_8_6(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			complex(kind=8), dimension(:, :, :, :, :, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_complex_8_6
+
+		subroutine kittie_put_real_8_6(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			real(kind=8), dimension(:, :, :, :, :, :), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_real_8_6
 
 end module kittie
 

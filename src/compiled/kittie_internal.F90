@@ -17,7 +17,7 @@ module kittie_internal
 
 	character(len=8), parameter :: writing=".writing"
 	character(len=8), parameter :: reading=".reading"
-	integer :: iounit=20
+	integer :: iounit=2018
 
 	! This is the namespace all the Kittie ADIOS-2 I/O lives in. Nicely, this will be completely independent of anything else ADIOS-2.
 	type(adios2_adios) :: kittie_adios
