@@ -66,7 +66,7 @@ class KittieJob(cheetah.Campaign):
                 sys.exit(1)
                 #raise ValueError(msg)
 
-            if level == logging.WARNING:
+            elif level == logging.WARNING:
                 output = self.logger.warn
             elif level == logging.INFO:
                 output = self.logger.info
@@ -109,15 +109,21 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config, 'rundir', 'kittie-run')
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job')
         self._SetIfNotFound(self.config, 'walltime', 1800, level=logging.WARNING)
+
         self._SetIfNotFound(self.config, 'machine', level=logging.ERROR)
+        self._SetIfNotFound(self.config['machine'], 'name', level=logging.ERROR)
+        self._SetIfNotFound(self.config['machine'], 'job_setup', value=None, level=logging.INFO)
+        self._SetIfNotFound(self.config['machine'], 'submit_setup', value=None, level=logging.INFO)
+        self._SetIfNotFound(self.config['machine'], 'runner_extra', value="", level=logging.INFO)
 
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
-        self.codesetup = self.config['run']
-        self.codenames = self.codesetup.keys()
 
         # Default blank iterables
         self._BlankInit(allscopes_dict, self.config, {})
         self._BlankInit(allscopes_list, self.config, [])
+
+        self.codesetup = self.config['run']
+        self.codenames = self.codesetup.keys()
         for codename in self.codenames:
             self._BlankInit(allscopes_dict, self.codesetup[codename], {})
             self._BlankInit(codescope_list, self.codesetup[codename], [])
@@ -268,10 +274,6 @@ class KittieJob(cheetah.Campaign):
             newpath = os.path.join(outdir, os.path.basename(name))
             os.symlink(name, newpath)
 
-        for name in copydict[self.keywords['copy']]:
-            newpath = os.path.join(outdir, os.path.basename(name))
-            KeepLinksCopy(name, newpath)
-
         for name in copydict[self.keywords['copycontents']]:
             if os.path.isdir(name):
                 for subname in os.listdir(name):
@@ -281,6 +283,14 @@ class KittieJob(cheetah.Campaign):
             else:
                 newpath = os.path.join(outdir, os.path.basename(name))
                 shutil.copy(name, newpath, follow_symlinks=False)
+
+        for name in copydict[self.keywords['copy']]:
+            if type(name) == list:
+                newpath = os.path.join(outdir, os.path.basename(name[1]))
+                KeepLinksCopy(name[0], newpath)
+            else:
+                newpath = os.path.join(outdir, os.path.basename(name))
+                KeepLinksCopy(name, newpath)
 
 
         # Do the user's requested file editing
@@ -431,6 +441,13 @@ class KittieJob(cheetah.Campaign):
         self.sweeps = [sweepgroup]
 
 
+        if self.config['machine']['job_setup'] is not None:
+            self.app_config_scripts = {self.machine: os.path.realpath(self.config['machine']['job_setup'])}
+
+        if self.config['machine']['submit_setup'] is not None:
+            self.run_dir_setup_script = os.path.realpath(self.config['machine']['submit_setup'])
+
+
     def Copy(self):
         """
         Copy() handles what the user asked to copy and/or symbolically link.
@@ -487,11 +504,13 @@ class KittieJob(cheetah.Campaign):
             shutil.rmtree(checkdir)
 
 
+
+
     def __init__(self, yamlfile):
         self.LoggerSetup()
         self.init(yamlfile)
         super(KittieJob, self).__init__(self.machine, "")
-        self.make_experiment_run_dir(self.output_dir)
+        self.make_experiment_run_dir(self.output_dir, runner_extra=self.config['machine']['runner_extra'])
         self.Copy()
         self.PreSubmitCommands()
         self.Link()

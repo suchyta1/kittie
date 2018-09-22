@@ -5,7 +5,11 @@ walltime: walltime  # Walltime limit for job
 
 
 # Machine properties -- Probably need reilated things to this
-machine: machine    # Info about the system where you're running
+machine: machine        # Info about the system where you're running
+name: name              # Cheetah name for the machine
+job_setup: job_setup    # Setup that runs in the job script before the main run
+submit_setup: submit_setup    # Setup that runs in the job script before the main run
+runner_extra: runner_extra
 
 
 # Copying type parameters

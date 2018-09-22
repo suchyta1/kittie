@@ -1,0 +1,8 @@
+#!/bin/bash
+
+mydir=$PWD
+
+cd $1/.cheetah/$USER
+./run-all.sh;
+cd $mydir
+
