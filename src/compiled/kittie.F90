@@ -54,9 +54,18 @@ module kittie
 
 	contains
 
-		subroutine until_nonexistent(helper)
+		recursive subroutine until_nonexistent(helper, verify_level)
 			type(coupling_helper), intent(in) :: helper
-			logical :: rexists, wexists
+			integer, intent(in), optional :: verify_level
+			logical :: rexists, wexists, redo
+			integer :: v, vlevel
+
+			if (present(verify_level)) then
+				vlevel = verify_level
+			else
+				vlevel = 3
+			end if
+			redo = .false.
 
 			do while (.true.)
 
@@ -85,8 +94,21 @@ module kittie
 
 			if (helper%mode == adios2_mode_write) then
 				call touch_file(trim(helper%filename)//writing)
+
 			else if (helper%mode == adios2_mode_read) then
 				call touch_file(trim(helper%filename)//reading)
+				do v=1, vlevel
+					inquire(file=trim(helper%filename)//writing, exist=wexists)
+					if (wexists) then
+						call delete_existing(helper%filename//reading)
+						redo = .true.
+						exit
+					end if
+				end do
+			end if
+
+			if (redo) then
+				call until_nonexistent(helper, verify_level=vlevel)
 			end if
 
 		end subroutine until_nonexistent
