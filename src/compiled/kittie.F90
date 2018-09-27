@@ -13,6 +13,7 @@ module kittie
         module procedure kittie_put_complex_8_6
         module procedure kittie_put_real_8_6
         module procedure kittie_put_integer
+        module procedure kittie_put_integer_8_1
         module procedure kittie_put_integer_8_2
         module procedure kittie_put_integer_4_2
         module procedure kittie_put_integer_8_4
@@ -22,11 +23,13 @@ module kittie
 
     interface kittie_get_selection
         module procedure kittie_get_selection_integer_1
+        module procedure kittie_get_selection_integer_8_1
         module procedure kittie_get_selection_integer_8_2
         module procedure kittie_get_selection_integer_4_2
         module procedure kittie_get_selection_integer_8_4
         module procedure kittie_get_selection_real_8_1
         module procedure kittie_get_selection_real_8_2
+        module procedure kittie_get_selection_real_8_3
         module procedure kittie_get_selection_real_8_4
         module procedure kittie_get_selection_complex_8_6
         module procedure kittie_get_selection_real_8_6
@@ -417,6 +420,19 @@ module kittie
 		end subroutine kittie_get_selection_integer_4_2
 
 
+		subroutine kittie_get_selection_integer_8_1(outdata, helper, varname, ndim, starts, counts, ierr)
+			integer(8), intent(out), dimension(:) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(:), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_integer_8_1
+
+
 		subroutine kittie_get_selection_integer_8_2(outdata, helper, varname, ndim, starts, counts, ierr)
 			integer(8), intent(out), dimension(:, :) :: outdata
 			type(coupling_helper), intent(in) :: helper
@@ -428,6 +444,7 @@ module kittie
 			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
 			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
 		end subroutine kittie_get_selection_integer_8_2
+
 
 		subroutine kittie_get_selection_integer_8_4(outdata, helper, varname, ndim, starts, counts, ierr)
 			integer(8), intent(out), dimension(:, :, :, :) :: outdata
@@ -465,8 +482,21 @@ module kittie
 			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
 			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
 		end subroutine kittie_get_selection_real_8_2
+	
+
+		subroutine kittie_get_selection_real_8_3(outdata, helper, varname, ndim, starts, counts, ierr)
+			real(kind=8), intent(out), dimension(:, :, :) :: outdata
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer, intent(in) :: ndim
+			integer(8), dimension(:), intent(in) :: starts, counts
+			integer, intent(out) :: ierr
+			type(adios2_variable) :: varid
+			varid = kittie_set_selection(helper, varname, ndim, starts, counts, ierr)
+			call adios2_get(helper%engine, varid, outdata, adios2_mode_deferred, ierr)
+		end subroutine kittie_get_selection_real_8_3
 		
-		
+
 		subroutine kittie_get_selection_real_8_4(outdata, helper, varname, ndim, starts, counts, ierr)
 			real(kind=8), intent(out), dimension(:, :, :, :) :: outdata
 			type(coupling_helper), intent(in) :: helper
@@ -622,6 +652,15 @@ module kittie
 			integer, intent(out) :: ierr
 			call adios2_put(helper%engine, varname, outdata, ierr)
 		end subroutine kittie_put_integer_4_2
+
+
+		subroutine kittie_put_integer_8_1(helper, varname, outdata, ierr)
+			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in) :: varname
+			integer(8), dimension(:), intent(in) :: outdata
+			integer, intent(out) :: ierr
+			call adios2_put(helper%engine, varname, outdata, ierr)
+		end subroutine kittie_put_integer_8_1
 
 
 		subroutine kittie_put_integer_8_2(helper, varname, outdata, ierr)
