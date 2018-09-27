@@ -278,6 +278,13 @@ module kittie
 		! Start of new things that I'm adding
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+		subroutine kittie_finalize(ierr)
+			integer, intent(out) :: ierr
+			call adios2_finalize(kittie_adios, ierr)
+		end subroutine kittie_finalize
+
+
 #		ifdef USE_MPI
 
 			subroutine kittie_initialize(comm, ierr, xml)
