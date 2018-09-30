@@ -17,5 +17,6 @@ find_package(ADIOS2 REQUIRED)
 
 # Add all the build files
 add_subdirectory(src)
+add_subdirectory(config)
 
 message(STATUS "prefix: ${CMAKE_INSTALL_PREFIX}")
