@@ -52,6 +52,13 @@ module kittie
 		logical :: instep=.false.
 		logical :: alive=.false.
 		character(len=:), allocatable :: engine_type
+
+		logical :: timed=.false., timeinit=.false.
+		character(len=:), allocatable :: timingfile, timinggroup
+		real(8), dimension(1) :: starttime, endtime, othertime
+		type(adios2_engine) :: timeengine
+		type(adios2_io) :: timingio
+
 	end type coupling_helper
 
 
@@ -170,6 +177,13 @@ module kittie
 			integer, intent(out) :: ierr
 			logical, intent(in), optional :: time
 
+
+			if (helper%timed .and. use_mpi) then
+				helper%othertime(1) = mpi_wtime() - helper%othertime(1)
+				helper%endtime(1) = mpi_wtime()
+			end if
+
+
 			if (helper%usesfile) then
 				call lock_state(helper, .true.)
 			end if
@@ -185,6 +199,17 @@ module kittie
 					call adios2_remove_all_variables(helper%io, ierr)
 				end if
 			end if
+
+
+			if (helper%timed .and. use_mpi) then
+				helper%endtime(1) = mpi_wtime() - helper%endtime(1)
+				call adios2_begin_step(helper%timeengine, adios2_step_mode_append, ierr)
+				call adios2_put(helper%timeengine, "start", helper%starttime, ierr)
+				call adios2_put(helper%timeengine, "end",   helper%endtime,   ierr)
+				call adios2_put(helper%timeengine, "other", helper%othertime, ierr)
+				call adios2_end_step(helper%timeengine, ierr)
+			end if
+
 
 		end subroutine kittie_couple_end_step
 
@@ -554,7 +579,7 @@ module kittie
 		end subroutine kittie_get_real_8
 
 
-		subroutine kittie_couple_start(helper, filename, groupname, mode, comm, step, ierr, dir)
+		subroutine kittie_couple_start(helper, filename, groupname, mode, comm, step, ierr, dir, timefile)
 			! Roughly the idea is push/fetch the given step, without worrying about how to do safely for different types of I/O.
 			! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
 
@@ -566,9 +591,38 @@ module kittie
 			integer, intent(in),  optional :: step
 			integer, intent(out), optional :: ierr
 			character(len=*), intent(in), optional :: dir
-			type(adios2_io) :: io
+			character(len=*), intent(in), optional :: timefile
+
+			type(adios2_io) :: io, timingio
 			type(adios2_engine) :: engine
-			integer :: iierr
+			integer :: iierr, comm_rank, comm_size
+			integer(8), dimension(1) :: gdims, offs, locs
+
+
+			if (present(timefile) .and. use_mpi) then
+				helper%timed = .true.
+				helper%timingfile = string_copy(timefile)
+				helper%timinggroup = string_copy(trim(groupname)//"-timing")
+
+				if (.not.helper%timeinit) then
+					call mpi_comm_rank(comm, comm_rank, iierr)
+					call mpi_comm_size(comm, comm_size, iierr)
+					gdims(1) = comm_size
+					offs(1)  = comm_rank
+					locs(1)  = 1
+					call kittie_declare_io(trim(helper%timinggroup), iierr)
+					call kittie_define_variable(trim(helper%timinggroup), "start",  adios2_type_dp, 1, gdims, offs, locs, iierr)
+					call kittie_define_variable(trim(helper%timinggroup), "end", adios2_type_dp, 1, gdims, offs, locs, iierr)
+					call kittie_define_variable(trim(helper%timinggroup), "other", adios2_type_dp, 1, gdims, offs, locs, iierr)
+					call adios2_at_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
+					call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, comm, iierr)
+					helper%timeinit = .true.
+				end if
+				helper%starttime(1) = mpi_wtime()
+			else
+				helper%timed = .false.
+			end if
+
 
 			call adios2_at_io(io, kittie_adios, trim(groupname), iierr)
 			!call adios2_set_engine(io, "SST", iierr)
@@ -623,6 +677,13 @@ module kittie
 			if (present(ierr)) then
 				ierr = iierr
 			end if
+
+
+			if (helper%timed .and. use_mpi) then
+				helper%starttime(1) = mpi_wtime() - helper%starttime(1)
+				helper%othertime(1) = mpi_wtime()
+			end if
+
 
 		end subroutine kittie_couple_start
 
