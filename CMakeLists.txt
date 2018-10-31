@@ -15,6 +15,12 @@ set_property(CACHE USE_MPI PROPERTY STRINGS "ON;TRUE;OFF;FALSE")
 # Find ADIOS-2
 find_package(ADIOS2 REQUIRED)
 
+if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
+	find_package(PythonInterp REQUIRED)
+else()
+	find_package(Python REQUIRED)
+endif()
+
 # Add all the build files
 add_subdirectory(src)
 add_subdirectory(config)

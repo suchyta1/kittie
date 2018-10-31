@@ -131,6 +131,7 @@ class KittieJob(cheetah.Campaign):
         allscopes_list = [self.keywords['copy'], self.keywords['copycontents'], self.keywords['link']]
         codescope_list = copy.copy(allscopes_list)
         codescope_list.append('args')
+        codescope_list.append('options')
         allscopes_dict = [self.keywords['file-edit']]
 
         # Do something (possible warn or exit) if certain things aren't found
@@ -468,6 +469,11 @@ class KittieJob(cheetah.Campaign):
             for i, arg in enumerate(args):
                 sweeparg = cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i), i, [arg])
                 sweepargs.append(sweeparg)
+
+            options = self.codesetup[codename]['options']
+            for i, option in enumerate(options):
+                sweepopt = cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option[0]), [option[1]])
+                sweepargs.append(sweepopt)
 
         # A sweep encompasses is a set of parameters that can vary. In my case nothing is varying, and the only sweep paramter is a single number of processes
         sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)

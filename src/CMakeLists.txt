@@ -1,4 +1,5 @@
-add_subdirectory(compiled)
+add_subdirectory(Fortran)
+add_subdirectory(Python)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/kittie.py DESTINATION ${CMAKE_INSTALL_PREFIX}/bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
