@@ -24,5 +24,6 @@ endif()
 # Add all the build files
 add_subdirectory(src)
 add_subdirectory(config)
+add_subdirectory(util)
 
 message(STATUS "prefix: ${CMAKE_INSTALL_PREFIX}")
