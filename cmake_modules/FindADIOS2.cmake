@@ -7,6 +7,7 @@ macro(adios2_implicit_deps linkflags libdirs libraries incflags incdirs)
 		string(REPLACE "-I" "" _INCDIR ${_INCDIR})
 		set(${incdirs} ${${incdirs}} ${_INCDIR})
     endforeach()
+	message(STATUS "incdirs: ${incdirs}")
 
 
 	# Find the library directories
@@ -15,12 +16,14 @@ macro(adios2_implicit_deps linkflags libdirs libraries incflags incdirs)
         string(REPLACE "-L" "" _LIBDIR ${_LIBDIR})
 		set(${libdirs} ${${libdirs}} ${_LIBDIR})
     endforeach()
+	message(STATUS "libdirs: ${libdirs}")
 
 	# Find the libraries
 	string(REGEX MATCHALL " -l([A-Za-z_0-9\\.-]+)" _LIBS "${${linkflags}}")
 	foreach(_LIB ${_LIBS})
         string(REPLACE " -l" "" _LIB ${_LIB})
 		find_library(_ILIB NAMES ${_LIB} HINTS ${dirs})
+		message(STATUS "_ILIB: ${_ILiB}")
 
         if(_ILIB)
 			set(${libraries} ${${libraries}} "${_ILIB}")
@@ -35,11 +38,13 @@ endmacro()
 
 
 find_file(ADIOS2_CONFIG adios2-config  HINTS "$ENV{ADIOS2_DIR}/bin")
+message(STATUS "ADIOS2_CONFIG: ${ADIOS2_CONFIG}")
 	
 if(ADIOS2_CONFIG)
 	set(ADIOS2_FOUND TRUE)
 
 	execute_process(COMMAND ${ADIOS2_CONFIG} --prefix    OUTPUT_VARIABLE ADIOS2_ROOT_DIR   RESULT_VARIABLE ADIOS2_CONFIG_RETURN  OUTPUT_STRIP_TRAILING_WHITESPACE)
+	message(STATUS "Ran adios2-config")
     if(NOT ADIOS2_CONFIG_RETURN EQUAL 0)
         set(ADIOS2_FOUND FALSE)
         message(STATUS "Can NOT execute 'adios2-config' properly - check file permissions?")
@@ -52,6 +57,7 @@ if(ADIOS2_CONFIG)
 	#execute_process(COMMAND ${ADIOS2_CONFIG} --cxxflags  OUTPUT_VARIABLE ADIOS2_INCFLAGS   RESULT_VARIABLE ADIOS2_CONFIG_RETURN  OUTPUT_STRIP_TRAILING_WHITESPACE)
 	set(ADIOS2_INCFLAGS -I${ADIOS2_ROOT_DIR}/include) 
 
+	message(STATUS "ADIOS2_INCFLAGS: ${ADIOS2_INCFLAGS}")
 	adios2_implicit_deps(ADIOS2_LINKFLAGS ADIOS2_LIBRARY_DIRS ADIOS2_LIBRARIES ADIOS2_INCFLAGS ADIOS2_INCLUDE_DIRS)
 
 	set(ADIOS2_INCLUDE_DIRS_FORTRAN ${ADIOS2_INCLUDE_DIRS} ${ADIOS2_ROOT_DIR}/include/fortran)
