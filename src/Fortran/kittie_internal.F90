@@ -64,4 +64,28 @@ module kittie_internal
 			close(iounit)
 		end subroutine touch_file
 
+
+#		ifndef USE_MPI
+			function mpi_wtime() result(time)
+				real(8) :: time
+				time = -1.0
+			end function mpi_wtime
+
+			subroutine mpi_barrier(comm, ierr)
+				integer, intent(in) :: comm
+				integer, intent(out) :: ierr
+			end subroutine mpi_barrier
+
+			subroutine mpi_comm_rank(comm, rank, ierr)
+				integer, intent(in) :: comm
+				integer, intent(out) :: rank, ierr
+			end subroutine mpi_comm_rank
+
+			subroutine mpi_comm_size(comm, ssize, ierr)
+				integer, intent(in) :: comm
+				integer, intent(out) :: ssize, ierr
+			end subroutine mpi_comm_size
+#		endif
+
+
 end module kittie_internal

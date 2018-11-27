@@ -325,7 +325,7 @@ module kittie
 			subroutine kittie_initialize(ierr, xml)
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(out) :: ierr
-				character(len=*), intent(in), optional :: xmll
+				character(len=*), intent(in), optional :: xml
 				if (present(xml)) then
 					call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
 				else
@@ -598,7 +598,13 @@ module kittie
 					call kittie_define_variable(trim(helper%timinggroup), "end", adios2_type_dp, 1, gdims, offs, locs, iierr)
 					call kittie_define_variable(trim(helper%timinggroup), "other", adios2_type_dp, 1, gdims, offs, locs, iierr)
 					call adios2_at_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
-					call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, comm, iierr)
+
+#					ifdef USE_MPI
+						call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, comm, iierr)
+#					else
+						call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, iierr)
+#					endif
+
 					helper%timeinit = .true.
 				end if
 				helper%starttime(1) = mpi_wtime()
