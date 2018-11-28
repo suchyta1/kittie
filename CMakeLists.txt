@@ -11,6 +11,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_modules)
 # Installation will fail if you don't give the MPI compiler wrappers and try to use MPI
 set(USE_MPI ON CACHE STRING "Use MPI")
 set_property(CACHE USE_MPI PROPERTY STRINGS "ON;TRUE;OFF;FALSE")
+set_property(CACHE PYTHON_PREFIX PROPERTY STRINGS "ON;TRUE;OFF;FALSE")
 
 # Find ADIOS-2
 find_package(ADIOS2 REQUIRED)
