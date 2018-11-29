@@ -326,11 +326,12 @@ module kittie
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
-				if (present(xml)) then
-					call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
-				else
-					call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
-				end if
+				!if (present(xml)) then
+				!	call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
+				!else
+				!	call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+				!end if
+				call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
 			end subroutine kittie_initialize
 
 #		endif
