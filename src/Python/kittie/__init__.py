@@ -1,1 +1,1 @@
-from kittie.kittie import *
+from kittie import *
