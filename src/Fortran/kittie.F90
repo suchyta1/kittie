@@ -224,7 +224,7 @@ module kittie
 			integer :: ierr
 			logical :: res
 
-			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'BP') .or. (trim(engine_type) == 'HDF5')) then
+			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'BP') .or. (trim(engine_type) == 'BP3') .or. (trim(engine_type) == 'HDF5')) then
 				res = .true.
 			else
 				res = .false.

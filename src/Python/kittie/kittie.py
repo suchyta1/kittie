@@ -102,7 +102,7 @@ class Coupler(object):
 
     @property
     def LockFile(self):
-        if self.io.EngineType().lower() in ['bpfile', 'bp', 'hdf5']:
+        if self.io.EngineType().lower() in ['bpfile', 'bp', 'bp3', 'hdf5']:
             return True
         else:
             return False
@@ -111,6 +111,7 @@ class Coupler(object):
     def FileSeek(self, step):
         found = False
         current_step = -1
+
         self.AcquireLock()
         self.engine = self.io.Open(self.filename, self.mode)
 
