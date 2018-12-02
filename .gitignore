@@ -1,4 +1,6 @@
 *.log
+*.pyc
+*.egg-info
 runs/
 build/
 install/
