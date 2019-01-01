@@ -62,7 +62,42 @@ module kittie
 	end type coupling_helper
 
 
+	type(coupling_helper), pointer :: common_helper
+	type(coupling_helper), dimension(:), allocatable, target :: helpers
+	character(len=128), dimension(:), allocatable :: groupnames
+	integer :: ngroupnames
+
+	namelist /setup/ ngroupnames
+	namelist /helpers_list/ groupnames
+
+
 	contains
+
+		subroutine kittie_read_helpers_file(filename)
+			character(len=*), intent(in) :: filename
+
+			open(unit=iounit, file=trim(filename), action='read')
+			read(iounit, nml=setup)
+			close(iounit)
+			allocate(groupnames(ngroupnames), helpers(ngroupnames))
+
+			open(unit=iounit, file=trim(filename), action='read')
+			read(iounit, nml=helpers_list)
+
+		end subroutine kittie_read_helpers_file
+
+		subroutine kittie_get_helper(groupname, helper)
+			character(len=*), intent(in) :: groupname
+			type(coupling_helper), pointer, intent(out) :: helper
+			integer :: i
+			do i=1, size(helpers)
+				if (trim(groupname) == trim(groupnames(i))) then
+					helper => helpers(i)
+					exit
+				end if
+			end do
+		end subroutine kittie_get_helper
+
 
 		recursive subroutine until_nonexistent(helper, verify_level)
 			type(coupling_helper), intent(in) :: helper
@@ -313,11 +348,21 @@ module kittie
 				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
 
+				character(len=128) :: filename = "kittie_groupnames.nml"
+				logical :: exists
+
 				if (present(xml)) then
 					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, ierr)
 				else
 					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
 				end if
+				
+				inquire(file=trim(filename), exist=exists)
+				if (exists) then
+					call kittie_read_helpers_file(filename)
+				end if
+
+
 			end subroutine kittie_initialize
 
 #		else
