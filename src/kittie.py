@@ -546,6 +546,15 @@ class KittieJob(cheetah.Campaign):
             shutil.rmtree(checkdir)
 
 
+    def WriteCodesFile(self):
+        gstrs = []
+        for i, code in enumerate(self.codenames):
+            gstrs.append("codenames({0}) = '{1}'".format(i+1, code))
+        for codename in self.codenames:
+            outstrs = ["&codes", "ncodes = {0}{1}codename = '{2}'".format(len(self.codenames), '\n', codename), "/", "&codes_list", '\n'.join(gstrs), "/\n"]
+            outstr = "\n\n".join(outstrs)
+            with open(os.path.join(self.mainpath, codename, "kittie_codenames.nml"), 'w') as out:
+                out.write(outstr)
 
 
     def __init__(self, yamlfile):
@@ -556,6 +565,7 @@ class KittieJob(cheetah.Campaign):
         self.Copy()
         self.PreSubmitCommands()
         self.Link()
+        self.WriteCodesFile()
         self.MoveLog()
 
 

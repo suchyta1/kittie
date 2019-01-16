@@ -15,8 +15,6 @@ module kittie_internal
 		logical :: use_mpi=.false.
 #	endif
 
-	character(len=8), parameter :: writing=".writing"
-	character(len=8), parameter :: reading=".reading"
 	integer :: iounit=2018
 
 	! This is the namespace all the Kittie ADIOS-2 I/O lives in. Nicely, this will be completely independent of anything else ADIOS-2.

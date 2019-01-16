@@ -418,7 +418,7 @@ class KittieParser(object):
         gstrs = []
         for i, group in enumerate(groups):
             gstrs.append("groupnames({0}) = {1}".format(i, group))
-        outstrs = ["&setup", "ngroupnames = {0}".format(len(groups)), "/", "&helpers_list", '\n'.join(gstrs), "/"]
+        outstrs = ["&setup", "ngroupnames = {0}".format(len(groups)), "/", "&helpers_list", '\n'.join(gstrs), "/\n"]
         outstr = "\n\n".join(outstrs)
         with open(os.path.join(outdir, "kittie_groupnames.nml"), 'w') as out:
             out.write(outstr)

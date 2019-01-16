@@ -64,27 +64,62 @@ module kittie
 
 	type(coupling_helper), pointer :: common_helper
 	type(coupling_helper), dimension(:), allocatable, target :: helpers
-	character(len=128), dimension(:), allocatable :: groupnames
-	integer :: ngroupnames
+	character(len=8), parameter :: writing=".writing"
+	character(len=8), parameter :: reading=".reading"
 
-	namelist /setup/ ngroupnames
-	namelist /helpers_list/ groupnames
+	! These need to be read from files at startup
+	integer :: ngroupnames, ncodes
+	character(len=128), dimension(:), allocatable :: groupnames, codenames
+	character(len=:), allocatable :: myreading
 
 
 	contains
 
 		subroutine kittie_read_helpers_file(filename)
 			character(len=*), intent(in) :: filename
+			logical :: exists
+			namelist /setup/ ngroupnames
+			namelist /helpers_list/ groupnames
 
-			open(unit=iounit, file=trim(filename), action='read')
-			read(iounit, nml=setup)
-			close(iounit)
-			allocate(groupnames(ngroupnames), helpers(ngroupnames))
-
-			open(unit=iounit, file=trim(filename), action='read')
-			read(iounit, nml=helpers_list)
+			inquire(file=trim(filename), exist=exists)
+			if (exists) then
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=setup)
+				close(iounit)
+				allocate(groupnames(ngroupnames), helpers(ngroupnames))
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=helpers_list)
+				close(iounit)
+			end if
 
 		end subroutine kittie_read_helpers_file
+
+
+		subroutine kittie_read_codes_file(filename)
+			character(len=*), intent(in) :: filename
+			character(len=128) :: codename
+			logical :: exists
+			integer :: pid
+			namelist /codes/ ncodes, codename
+			namelist /codes_list/ codenames
+
+			inquire(file=trim(filename), exist=exists)
+			if (exists) then
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=codes)
+				close(iounit)
+				allocate(codenames(ncodes))
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=codes_list)
+				close(iounit)
+			else
+				pid = getpid()
+				write(codename, "(I0)") pid
+			end if
+			myreading = string_copy(reading // '-' // trim(codename))
+
+		end subroutine kittie_read_codes_file
+
 
 		subroutine kittie_get_helper(groupname, helper)
 			character(len=*), intent(in) :: groupname
@@ -121,12 +156,12 @@ module kittie
 					end if
 				end if
 
-				inquire(file=trim(helper%filename)//reading, exist=rexists)
+				inquire(file=trim(helper%filename)//myreading, exist=rexists)
 				inquire(file=trim(helper%filename)//writing, exist=wexists)
 
 				if (rexists .and. wexists) then
 					if  (helper%mode == adios2_mode_read) then
-						call delete_existing(helper%filename//reading)
+						call delete_existing(helper%filename//myreading)
 					end if
 					cycle
 				else if (rexists .or. wexists) then
@@ -141,11 +176,11 @@ module kittie
 				call touch_file(trim(helper%filename)//writing)
 
 			else if (helper%mode == adios2_mode_read) then
-				call touch_file(trim(helper%filename)//reading)
+				call touch_file(trim(helper%filename)//myreading)
 				do v=1, vlevel
 					inquire(file=trim(helper%filename)//writing, exist=wexists)
 					if (wexists) then
-						call delete_existing(helper%filename//reading)
+						call delete_existing(helper%filename//myreading)
 						redo = .true.
 						exit
 					end if
@@ -169,7 +204,7 @@ module kittie
 				if (helper%mode == adios2_mode_write) then
 					call delete_existing(helper%filename//writing)
 				else if (helper%mode == adios2_mode_read) then
-					call delete_existing(helper%filename//reading)
+					call delete_existing(helper%filename//myreading)
 				end if
 			end if
 
@@ -181,13 +216,12 @@ module kittie
 			logical, intent(in) :: yes
 			integer :: ierr, rank, stat
 
-			if (use_mpi .and. (.not. yes))  then
-				call mpi_barrier(helper%comm, ierr)
-			end if
-
 			if (use_mpi) then
+				if (.not.yes) then
+					call mpi_barrier(helper%comm, ierr)
+				end if
 				call mpi_comm_rank(helper%comm, rank, ierr)
-			endif
+			end if
 
 			if ((.not.use_mpi) .or. (rank == 0)) then
 				call lock_logic(helper, yes)
@@ -348,20 +382,18 @@ module kittie
 				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
 
-				character(len=128) :: filename = "kittie_groupnames.nml"
+				character(len=128) :: filename
 				logical :: exists
+				integer :: pid
 
 				if (present(xml)) then
 					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, ierr)
 				else
 					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
 				end if
-				
-				inquire(file=trim(filename), exist=exists)
-				if (exists) then
-					call kittie_read_helpers_file(filename)
-				end if
 
+				call kittie_read_helpers_file("kittie_groupnames.nml")
+				call kittie_read_codes_file("kittie_codenames.nml")
 
 			end subroutine kittie_initialize
 
