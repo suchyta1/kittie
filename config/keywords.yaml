@@ -23,3 +23,4 @@ pre-sub-cmds: pre-submit-commands  # Commands that run before submitting the job
 
 
 file-edit: file-edit
+include: include

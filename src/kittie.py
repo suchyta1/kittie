@@ -95,7 +95,7 @@ class KittieJob(cheetah.Campaign):
                 #raise ValueError(msg)
 
             elif level == logging.WARNING:
-                output = self.logger.warn
+                output = self.logger.warning
             elif level == logging.INFO:
                 output = self.logger.info
 
@@ -118,9 +118,6 @@ class KittieJob(cheetah.Campaign):
         """
         There are a reasonable number of config params. It's a good idea to have some automated defaulting going on.
         """
-
-        # Kittie allows the user to set their own names for the fields in the config file if she wants.
-        self._KeywordSetup()
 
         # Some things that'll be given to Cheetah
         self.cheetahdir = '.cheetah'
@@ -231,7 +228,7 @@ class KittieJob(cheetah.Campaign):
     """
 
 
-    def _MakeReplacements(self, searchstr=None, main=None):
+    def _MakeReplacements(self, searchstr=None, main=None, include=False):
         """
         Look for ${} things to be replaced in the user's input config file, and replace them with the values defined elsewhere in the file.
         """
@@ -276,18 +273,21 @@ class KittieJob(cheetah.Campaign):
                 match = subresults[0][0]
 
             # The name location itself by be defined in terms of other things, so call the method on that too to resolve it
-            match = self._MakeReplacements(match)
+            match = self._MakeReplacements(match, include=include)
             keys = match.split(".")
             value = self.config
 
-            # Set the located value in our config text that weve been looking through to replace to the old value
-            for key in keys:
-                value = value[key]
-            for i in index:
-                value = value[i]
-            subpattern = "\$\{" + origmatch.replace(".", "\.").replace('[', '\[').replace(']', '\]').replace('$', '\$') + "\}"
-            subsearch = re.compile(subpattern)
-            searchstr = subsearch.sub(str(value), searchstr, count=1)
+            try:
+                # Set the located value in our config text that weve been looking through to replace to the old value
+                for key in keys:
+                    value = value[key]
+                for i in index:
+                    value = value[i]
+                subpattern = "\$\{" + origmatch.replace(".", "\.").replace('[', '\[').replace(']', '\]').replace('$', '\$') + "\}"
+                subsearch = re.compile(subpattern)
+                searchstr = subsearch.sub(str(value), searchstr, count=1)
+            except(KeyError):
+                pass
 
 
         # Propogate the changes back into the config dictionary
@@ -295,8 +295,10 @@ class KittieJob(cheetah.Campaign):
             searchstr = searchstr.replace('$${', '${')
             self.config = yaml.load(searchstr)
             results = search.findall(searchstr)
-            if len(results) > 0:
-                match = self._MakeReplacements()
+            if (len(results) > 0) and (not include):
+                match = self._MakeReplacements(include=include)
+            else:
+                return searchstr
         else:
             return searchstr
 
@@ -335,7 +337,7 @@ class KittieJob(cheetah.Campaign):
         for filename in edits.keys():
             filepath = os.path.join(outdir, filename)
             if not os.path.exists(filepath):
-                self.logger.warn("{0} does not exist. Ignorning request to edit the file.".format(filepath))
+                self.logger.warning("{0} does not exist. Ignorning request to edit the file.".format(filepath))
                 continue
             with open(filepath) as instream:
                 txt = instream.read()
@@ -418,6 +420,23 @@ class KittieJob(cheetah.Campaign):
         # Read in the config file
         with open(yamlfile, 'r') as ystream:
             self.config = yaml.load(ystream)
+
+
+        # Kittie allows the user to set their own names for the fields in the config file if she wants.
+        self._KeywordSetup()
+
+
+        # Include other YAML files
+        self._SetIfNotFound(self.config, 'include', [], level=logging.INFO)
+        if len(self.config[self.keywords['include']]) > 0:
+            try:
+                self._MakeReplacements(include=True)
+            except(KeyError):
+                pass
+        for filename in self.config['include']:
+            with open(filename, 'r') as ystream:
+                self.config.update(yaml.load(ystream))
+
 
         # Make value replacements -- this when the user does things like processes-per-node: ${run.xgc.processes}
         self._MakeReplacements()
