@@ -200,8 +200,6 @@ class KittieJob(cheetah.Campaign):
                 match = subresults[0][0]
 
 
-            print(index)
-            print(match, origmatch)
             value = self.config[match]
             for i in index:
                 value = value[i]
@@ -226,6 +224,22 @@ class KittieJob(cheetah.Campaign):
         else:
             return searchstr
     """
+
+    def _Unmatched(self, match):
+        unmatched_close = '^[^\{]*\}'
+        usearch = re.compile(unmatched_close)
+        un1 = usearch.search(match)
+        unmatched_open = '\{[^\}]*$'
+        usearch = re.compile(unmatched_open)
+        un2 = usearch.search(match)
+
+        matches = []
+        if (un1 is not None) and (un2 is not None):
+            matches.append(match[:un1.end()-1])
+            matches.append(match[un2.start()+1:])
+            return matches
+        else:
+            return [match]
 
 
     def _MakeReplacements(self, searchstr=None, main=None, include=False):
@@ -252,42 +266,54 @@ class KittieJob(cheetah.Campaign):
         results = search.findall(searchstr)
 
         for match in results:
-
             if main:
                 self.config = yaml.load(searchstr.replace('$${', '${'))
+            origmatches = self._Unmatched(match)
 
-            origmatch = match
+            for i, origmatch in enumerate(origmatches):
+                match = origmatch
 
-            # This assumes that lists always end the entries. That's probably OK, at least for now
-            mpattern = "(.*)\[(\d*)\]$"
-            msearch = re.compile(mpattern)
-            index = []
+                # This assumes that lists always end the entries. That's probably OK, at least for now
+                mpattern = "(.*)\[(\d*)\]$"
+                msearch = re.compile(mpattern)
+                index = []
 
-            # Iteratively looks for lists ending the objects
-            while True:
-                subresults = msearch.findall(match)
-                if len(subresults) == 0:
-                    break
+                # Iteratively lookis for lists ending the objects
+                while True:
+                    subresults = msearch.findall(match)
+                    if len(subresults) == 0:
+                        break
 
-                index.insert(0, int(subresults[0][1]))
-                match = subresults[0][0]
+                    index.insert(0, int(subresults[0][1]))
+                    match = subresults[0][0]
 
-            # The name location itself by be defined in terms of other things, so call the method on that too to resolve it
-            match = self._MakeReplacements(match, include=include)
-            keys = match.split(".")
-            value = self.config
+                # The name location itself by be defined in terms of other things, so call the method on that too to resolve it
+                match = self._MakeReplacements(match, include=include)
+                keys = match.split(".")
+                value = self.config
 
-            try:
-                # Set the located value in our config text that weve been looking through to replace to the old value
-                for key in keys:
-                    value = value[key]
-                for i in index:
-                    value = value[i]
-                subpattern = "\$\{" + origmatch.replace(".", "\.").replace('[', '\[').replace(']', '\]').replace('$', '\$') + "\}"
-                subsearch = re.compile(subpattern)
-                searchstr = subsearch.sub(str(value), searchstr, count=1)
-            except(KeyError):
-                pass
+                try:
+                    # Set the located value in our config text that weve been looking through to replace to the old value
+                    for key in keys:
+                        value = value[key]
+                    for i in index:
+                        value = value[i]
+
+                    if len(origmatches) > 1:
+                        omatch = match
+                    else:
+                        omatch = origmatch
+                    for m in ['.', '[', '[', '$']:
+                        omatch = omatch.replace(m, '\{0}'.format(m))
+                    subpattern = "{1}{0}{2}".format(omatch, '\$\{', '\}')
+
+                    subsearch = re.compile(subpattern)
+                    if type(value) is OrderedDict:
+                        searchstr = subsearch.sub(str(dict(value)), searchstr, count=1)
+                    else:
+                        searchstr = subsearch.sub(str(value), searchstr, count=1)
+                except(KeyError):
+                    pass
 
 
         # Propogate the changes back into the config dictionary
