@@ -231,13 +231,25 @@ class KittieParser(object):
         bss = text.strip()
         argstart = bss.find('(') + 1
         astr = bss[argstart:-1]
-        alist = astr.split(',')
-        for i, a in enumerate(alist):
-            alist[i] = a.strip()
+
+        alist = []
+        opened = 0
+        start = 0
+        for i in range(len(astr)):
+            if astr[i] == '(':
+                opened += 1
+            elif astr[i] == ')':
+                opened -= 1
+            elif (astr[i] == ',') and (opened == 0):
+                alist += [astr[start:i].strip()]
+                start = i + 1
+            elif i == len(astr) - 1:
+                alist += [astr[start:].strip()]
         return alist
 
     def GetAdiosArgs(self, text, commanddict, names):
         alist = self.GetArgList(text)
+        print("alist", alist)
         for i, name in enumerate(names):
             commanddict[name] = alist[i]
         return commanddict
@@ -417,7 +429,7 @@ class KittieParser(object):
     def WriteGroupsFile(self, groups, outdir):
         gstrs = []
         for i, group in enumerate(groups):
-            gstrs.append("groupnames({0}) = {1}".format(i, group))
+            gstrs.append("groupnames({0}) = {1}".format(i+1, group))
         outstrs = ["&setup", "ngroupnames = {0}".format(len(groups)), "/", "&helpers_list", '\n'.join(gstrs), "/\n"]
         outstr = "\n\n".join(outstrs)
         with open(os.path.join(outdir, "kittie_groupnames.nml"), 'w') as out:

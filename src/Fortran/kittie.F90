@@ -68,8 +68,10 @@ module kittie
 	character(len=8), parameter :: reading=".reading"
 
 	! These need to be read from files at startup
-	integer :: ngroupnames, ncodes
-	character(len=128), dimension(:), allocatable :: groupnames, codenames
+	integer :: ngroupnames, ncodes, nnames
+	character(len=128), dimension(:), allocatable :: groupnames, codenames, names, engines
+	character(len=128), dimension(:, :), allocatable :: plots, params, values
+	integer, dimension(:), allocatable :: nplots, nparams
 	character(len=:), allocatable :: myreading
 
 
@@ -132,6 +134,52 @@ module kittie
 				end if
 			end do
 		end subroutine kittie_get_helper
+
+
+		subroutine kittie_read_groups_file(filename)
+			character(len=*), intent(in) :: filename
+			character(len=128) :: codename
+			logical :: exists
+			integer :: maxsize, maxparams, i, ierr
+			type(adios2_io) :: io
+			namelist /ionames/ nnames
+			namelist /ionames_list/ names, engines, nplots, nparams
+			namelist /plots_list/ plots
+			namelist /params_list/ params, values
+			inquire(file=trim(filename), exist=exists)
+
+			if (exists) then
+
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=ionames)
+				close(iounit)
+
+				allocate(names(nnames), engines(nnames), nplots(nnames), nparams(nnames))
+				do i=1, nnames
+					engines(i) = ""
+					nplots(i) = 0
+					nparams(i) = 0
+				end do
+				open(unit=iounit, file=trim(filename), action='read')
+				read(iounit, nml=ionames_list)
+				close(iounit)
+
+				if (nnames > 0) then
+					maxsize = maxval(nplots)
+					maxparams = maxval(nparams)
+					allocate(plots(nnames, maxsize), params(nnames, maxparams), values(nnames, maxparams))
+					open(unit=iounit, file=trim(filename), action='read')
+					read(iounit, nml=plots_list)
+					close(iounit)
+					open(unit=iounit, file=trim(filename), action='read')
+					read(iounit, nml=params_list)
+					close(iounit)
+				end if
+
+			end if
+
+		end subroutine kittie_read_groups_file
+
 
 
 		recursive subroutine until_nonexistent(helper, verify_level)
@@ -394,6 +442,7 @@ module kittie
 
 				call kittie_read_helpers_file("kittie_groupnames.nml")
 				call kittie_read_codes_file("kittie_codenames.nml")
+				call kittie_read_groups_file("kittie_groups.nml")
 
 			end subroutine kittie_initialize
 
@@ -418,8 +467,19 @@ module kittie
 			! Initialize a new Kittie coupling I/O group
 			character(len=*), intent(in) :: groupname
 			integer, intent(out) :: ierr
+			integer :: i, j
 			type(adios2_io) :: io
 			call adios2_declare_io(io, kittie_adios, trim(groupname), ierr)
+			do i=1, nnames
+				if ((trim(names(i)) == trim(groupname)) .and. (trim(engines(i)) /= "")) then
+					call adios2_set_engine(io, trim(engines(i)), ierr)
+				end if
+
+				do j=1, nparams(i)
+					call adios2_set_parameter(io, params(i, j), values(i, j), ierr)
+				end do
+					
+			end do
 		end subroutine kittie_declare_io
 
 

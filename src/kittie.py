@@ -517,6 +517,63 @@ class KittieJob(cheetah.Campaign):
             shutil.rmtree(checkdir)
 
 
+    def Namelist(self, *args):
+        groups = []
+        for arg in args:
+            groups += ["&{0}{2}{1}{2}/\n".format(arg[0], arg[1], '\n\n')]
+        outstr = "\n".join(groups)
+        return outstr
+
+
+    def WriteGroupsFile(self):
+        for i, codename in enumerate(self.codenames):
+            gstrs = []
+            pstrs = []
+            keys = self.codesetup[codename]['groups'].keys()
+            names = ["ionames", "nnames = {0}".format(len(keys))]
+            for i, key in enumerate(keys):
+                entry = self.codesetup[codename]['groups'][key]
+                gstr = "names({0}) = '{1}'".format(i+1, key)
+
+                nparams = 0
+                params = []
+                values = []
+
+                if "engine" in entry:
+                    engine = entry["engine"]
+                    if type(engine) is str:
+                        gstr = "{0}{1}engines({2}) = '{3}'".format(gstr, '\n', i+1, engine)
+                    elif type(engine) is OrderedDict:
+                        gstr = "{0}{1}engines({2}) = '{3}'".format(gstr, '\n', i+1, engine['name'])
+                        enginekeys = list(engine.keys())
+                        for j in range(len(enginekeys)):
+                            if enginekeys[j] == "name":
+                                del enginekeys[j]
+                                break
+                        nparams = len(enginekeys)
+                        gstr = "{0}{1}nparams({2}) = {3}".format(gstr, '\n', i+1, nparams)
+
+                for j in range(nparams):
+                    key = enginekeys[j]
+                    params += ["params({0}, {1}) = '{2}'".format(i+1, j+1, key)]
+                    values += ["values({0}, {1}) = '{2}'".format(i+1, j+1, engine[key])]
+
+                if "plot" in entry:
+                    gstr = "{0}{1}nplots({2}) = {3}".format(gstr, "\n", i+1, len(entry['plot']))
+                    for j, name in enumerate(entry['plot']):
+                        pstrs += ["plots({0}, {1}) = '{2}'".format(i+1, j+1, name)]
+
+                gstrs += [gstr]
+
+            names_list = ["ionames_list", '\n'.join(gstrs)]
+            plots_list = ["plots_list", '\n'.join(pstrs)]
+            params_list = ["params_list", '\n'.join(params+values)]
+
+            outstr = self.Namelist(names, names_list, plots_list, params_list)
+            with open(os.path.join(self.mainpath, codename, "kittie_groups.nml"), 'w') as out:
+                out.write(outstr)
+
+
     def WriteCodesFile(self):
         gstrs = []
         for i, code in enumerate(self.codenames):
@@ -537,6 +594,7 @@ class KittieJob(cheetah.Campaign):
         self.PreSubmitCommands()
         self.Link()
         self.WriteCodesFile()
+        self.WriteGroupsFile()
         self.MoveLog()
 
 
