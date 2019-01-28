@@ -25,30 +25,18 @@ import yaml
 import collections
 from collections import OrderedDict
 
-"""
-def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
-    class OrderedLoader(Loader):
-        pass
-    def construct_mapping(loader, node):
-        loader.flatten_mapping(node)
-        return object_pairs_hook(loader.construct_pairs(node))
-    OrderedLoader.add_constructor(
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-        construct_mapping)
-    return yaml.load(stream, OrderedLoader)
-"""
-
-_mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
 
 def dict_representer(dumper, data):
-    #return dumper.represent_dict(data.iteritems())
     return dumper.represent_dict(data.items())
 
 def dict_constructor(loader, node):
     return collections.OrderedDict(loader.construct_pairs(node))
 
-yaml.add_representer(collections.OrderedDict, dict_representer)
-yaml.add_constructor(_mapping_tag, dict_constructor)
+class OrderedLoader(yaml.Loader):
+    pass
+
+class OrderedDumper(yaml.Dumper):
+    pass
 
 
 def KeepLinksCopy(inpath, outpath):
@@ -71,7 +59,7 @@ class KittieJob(cheetah.Campaign):
         keywordspath = os.path.join(dirname, "config", "keywords.yaml")
 
         with open(keywordspath, 'r') as ystream:
-            config = yaml.load(ystream)
+            config = yaml.load(ystream, Loader=self.OrderedLoader)
 
         self.keywords = {}
         for key in config.keys():
@@ -124,12 +112,6 @@ class KittieJob(cheetah.Campaign):
         self.groupname = "kittie-run"
         self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-{0:03d}'.format(0))
 
-        # Allow certain sets of keywords generally in different parts of the config file
-        allscopes_list = [self.keywords['copy'], self.keywords['copycontents'], self.keywords['link']]
-        codescope_list = copy.copy(allscopes_list)
-        codescope_list.append('args')
-        codescope_list.append('options')
-        allscopes_dict = [self.keywords['file-edit']]
 
         # Do something (possible warn or exit) if certain things aren't found
         self._SetIfNotFound(self.config, 'rundir', 'kittie-run')
@@ -144,86 +126,21 @@ class KittieJob(cheetah.Campaign):
 
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
 
-        # Default blank iterables
+
+        # Allow certain sets of keywords generally in different parts of the config file, and initialize then to be empty
+        allscopes_list = [self.keywords['copy'], self.keywords['copycontents'], self.keywords['link']]
+        allscopes_dict = [self.keywords['file-edit']]
         self._BlankInit(allscopes_dict, self.config, {})
         self._BlankInit(allscopes_list, self.config, [])
 
         self.codesetup = self.config['run']
         self.codenames = self.codesetup.keys()
+        codescope_list = allscopes_list + ['args', 'options']
+        codescope_dict = allscopes_dict + ['groups']
         for codename in self.codenames:
-            self._BlankInit(allscopes_dict, self.codesetup[codename], {})
+            self._BlankInit(codescope_dict, self.codesetup[codename], {})
             self._BlankInit(codescope_list, self.codesetup[codename], [])
 
-
-    """
-    def _AlternateMakeReplacements(self):
-        if searchstr is None:
-            searchstr = yaml.dump(self.config, default_flow_style=False)
-            main = True
-        else:
-            main = False
-
-
-        pattern = '(?<!\$)\$\{(.*)\}'
-        search = re.compile(pattern)
-        results = search.findall(searchstr)
-
-
-        for match in results:
-            origmatch = match
-
-            # This assumes that lists always end the entries. That's probably OK, at least for now
-            mpattern = "(.*)\[(\d*)\]$"
-            msearch = re.compile(mpattern)
-            index = []
-
-            while True:
-                subresults = msearch.findall(match)
-                if len(subresults) == 0:
-                    break
-
-                # This wan't fully working yet
-                # I discontinued the [] instead of . dictionary indexing b/c it became hard to read
-
-                v = subresults[0][1]
-                if v[0] in ('-', '+'):
-                    check = v[1:]
-                else:
-                    check = v
-
-                if check.isdigit():
-                    v = int(v)
-                else:
-                    v = self._MakeReplacements(v)
-
-                index.insert(0, v)
-                match = subresults[0][0]
-
-
-            value = self.config[match]
-            for i in index:
-                value = value[i]
-
-
-            match = self._MakeReplacements(match)
-            keys = match.split(".")
-            value = self.config
-
-            for key in keys:
-                value = value[key]
-            for i in index:
-                value = value[i]
-
-            subpattern = "\$\{" + origmatch.replace(".", "\.").replace('[', '\[').replace(']', '\]').replace('$', '\$') + "\}"
-            subsearch = re.compile(subpattern)
-            searchstr = subsearch.sub(str(value), searchstr, count=1)
-
-        if main:
-            searchstr = searchstr.replace('$${', '${')
-            self.config = yaml.load(searchstr)
-        else:
-            return searchstr
-    """
 
     def _Unmatched(self, match):
         unmatched_close = '^[^\{]*\}'
@@ -254,7 +171,7 @@ class KittieJob(cheetah.Campaign):
 
         # Did we call the function the first time, or are we doing it recursively?
         if searchstr is None:
-            searchstr = yaml.dump(self.config, default_flow_style=False)
+            searchstr = yaml.dump(self.config, default_flow_style=False, Dumper=self.OrderedDumper)
             main = True
         else:
             if main is None:
@@ -267,7 +184,7 @@ class KittieJob(cheetah.Campaign):
 
         for match in results:
             if main:
-                self.config = yaml.load(searchstr.replace('$${', '${'))
+                self.config = yaml.load(searchstr.replace('$${', '${'), Loader=self.OrderedLoader)
             origmatches = self._Unmatched(match)
 
             for i, origmatch in enumerate(origmatches):
@@ -308,7 +225,7 @@ class KittieJob(cheetah.Campaign):
                     subpattern = "{1}{0}{2}".format(omatch, '\$\{', '\}')
 
                     subsearch = re.compile(subpattern)
-                    if type(value) is OrderedDict:
+                    if type(value) is collections.OrderedDict:
                         searchstr = subsearch.sub(str(dict(value)), searchstr, count=1)
                     else:
                         searchstr = subsearch.sub(str(value), searchstr, count=1)
@@ -319,7 +236,7 @@ class KittieJob(cheetah.Campaign):
         # Propogate the changes back into the config dictionary
         if main:
             searchstr = searchstr.replace('$${', '${')
-            self.config = yaml.load(searchstr)
+            self.config = yaml.load(searchstr, Loader=self.OrderedLoader)
             results = search.findall(searchstr)
             if (len(results) > 0) and (not include):
                 match = self._MakeReplacements(include=include)
@@ -437,15 +354,24 @@ class KittieJob(cheetah.Campaign):
         self.logger.addHandler(self.streamhandler)
 
 
+    def YAMLSetup(self):
+        self.OrderedLoader = OrderedLoader
+        self.OrderedLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, dict_constructor)
+        self.OrderedDumper = OrderedDumper
+        self.OrderedDumper.add_representer(collections.OrderedDict, dict_representer)
+
+
     def init(self, yamlfile):
         """
         init() is what does the Cheetah-related setup.
         It doesn't require the user to write a Cheetah class file. It reads the Kittie config file, and then figures out how to subclass Cheetah.
         """
 
+        self.YAMLSetup()
+
         # Read in the config file
         with open(yamlfile, 'r') as ystream:
-            self.config = yaml.load(ystream)
+            self.config = yaml.load(ystream, Loader=self.OrderedLoader)
 
 
         # Kittie allows the user to set their own names for the fields in the config file if she wants.
@@ -461,7 +387,7 @@ class KittieJob(cheetah.Campaign):
                 pass
         for filename in self.config['include']:
             with open(filename, 'r') as ystream:
-                self.config.update(yaml.load(ystream))
+                self.config.update(yaml.load(ystream), Loader=self.OrderedLoader)
 
 
         # Make value replacements -- this when the user does things like processes-per-node: ${run.xgc.processes}
