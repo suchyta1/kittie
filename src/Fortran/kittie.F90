@@ -48,6 +48,7 @@ module kittie
 		type(adios2_io) :: io
 		integer :: mode
 		integer :: comm
+		integer :: rank
 		logical :: usesfile
 		logical :: instep=.false.
 		logical :: alive=.false.
@@ -92,6 +93,8 @@ module kittie
 				open(unit=iounit, file=trim(filename), action='read')
 				read(iounit, nml=helpers_list)
 				close(iounit)
+			else
+				ngroupnames = 0
 			end if
 
 		end subroutine kittie_read_helpers_file
@@ -264,18 +267,15 @@ module kittie
 			logical, intent(in) :: yes
 			integer :: ierr, rank, stat
 
-			if (use_mpi) then
-				if (.not.yes) then
-					call mpi_barrier(helper%comm, ierr)
-				end if
-				call mpi_comm_rank(helper%comm, rank, ierr)
+			if (.not.yes) then
+				call mpi_barrier(helper%comm, ierr)
 			end if
 
-			if ((.not.use_mpi) .or. (rank == 0)) then
+			if (helper%rank == 0) then
 				call lock_logic(helper, yes)
 			end if
 
-			if (use_mpi .and. yes) then
+			if (yes) then
 				call mpi_barrier(helper%comm, ierr)
 			end if
 
@@ -418,7 +418,13 @@ module kittie
 
 		subroutine kittie_finalize(ierr)
 			integer, intent(out) :: ierr
+			integer :: i, rank
 			call adios2_finalize(kittie_adios, ierr)
+			do i=1, size(helpers)
+				if (helpers(i)%rank == 0) then
+					call touch_file(trim(helpers(i)%filename)//'.done')
+				end if
+			end do
 		end subroutine kittie_finalize
 
 
@@ -756,6 +762,7 @@ module kittie
 				
 				if (present(comm)) then
 					helper%comm = comm
+					call mpi_comm_rank(helper%comm, helper%rank, iierr)
 				endif
 
 				helper%engine_type = which_engine(io)

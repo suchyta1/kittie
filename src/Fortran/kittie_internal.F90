@@ -72,16 +72,21 @@ module kittie_internal
 			subroutine mpi_barrier(comm, ierr)
 				integer, intent(in) :: comm
 				integer, intent(out) :: ierr
+				ierr = 0
 			end subroutine mpi_barrier
 
 			subroutine mpi_comm_rank(comm, rank, ierr)
 				integer, intent(in) :: comm
 				integer, intent(out) :: rank, ierr
+				rank = 0
+				ierr = 0
 			end subroutine mpi_comm_rank
 
 			subroutine mpi_comm_size(comm, ssize, ierr)
 				integer, intent(in) :: comm
 				integer, intent(out) :: ssize, ierr
+				ssize = 1
+				ierr = 0
 			end subroutine mpi_comm_size
 #		endif
 
