@@ -5,6 +5,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import adios2
 import datetime
 import os
+import copy
 import numpy as np
 
 
@@ -23,8 +24,15 @@ def Initialize(comm=None, xml=None):
 
 class Group(object):
 
-    def __init__(self, groupname):
+    def __init__(self, groupname, engine=None):
         self.io = ADIOS2.adios.DeclareIO(groupname)
+        if type(engine) is str:
+            self.io.SetEngine(engine)
+        elif type(engine) is dict:
+            self.io.SetEngine(engine['name'])
+            e = copy.copy(engine)
+            del e['name']
+            self.io.SetParameters(e)
 
 
     def DefineVariable(self, name, gdims, odims, ldims, dtype):
@@ -108,7 +116,7 @@ class Coupler(object):
             return False
 
 
-    def FileSeek(self, step):
+    def FileSeek(self, step, timeout=-1):
         found = False
         current_step = -1
 
@@ -116,7 +124,7 @@ class Coupler(object):
         self.engine = self.io.Open(self.filename, self.mode)
 
         while True:
-            status = self.engine.BeginStep(adios2.StepMode.NextAvailable)
+            status = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout=timeout)
             if status == adios2.StepStatus.OK:
                 current_step = current_step + 1
             else:
@@ -131,11 +139,11 @@ class Coupler(object):
         self.ReleaseLock()
         if not found:
             self.engine.Close()
-            #call adios2_remove_all_variables(helper%io, ierr)
+            self.io.RemoveAllVariables()
 
-            self.groupname = "{0}+".format(self.groupname)
-            Group(self.groupname)
-            self.io = ADIOS2.adios.AtIO(self.groupname)
+            #self.groupname = "{0}+".format(self.groupname)
+            #Group(self.groupname)
+            #self.io = ADIOS2.adios.AtIO(self.groupname)
 
             #self.FileSeek(step)
 
@@ -156,7 +164,7 @@ class Coupler(object):
             * The others have basically the same names
     """
 
-    def BeginStep(self, filename=None, groupname=None, mode=None, comm=None, step=None, timefile=None):
+    def BeginStep(self, filename=None, groupname=None, mode=None, comm=None, step=None, timefile=None, timeout=-1):
         if groupname is not None:
             self.groupname = groupname
             self.io = ADIOS2.adios.AtIO(self.groupname)
@@ -195,6 +203,7 @@ class Coupler(object):
                 self.CoupleOpen()
                 #self.io.LockDefinitions()
             self.engine.BeginStep(adios2.StepMode.Append)
+            found = True
 
         elif self.mode == adios2.Mode.Read:
             if self.LockFile:
@@ -203,18 +212,22 @@ class Coupler(object):
 
                 found = False
                 while not found:
-                    found = self.FileSeek(step)
+                    found = self.FileSeek(step, timeout)
+                    if timeout != -1:
+                        break
 
             else:
                 if not self.init:
                     self.CoupleOpen()
-                self.engine.BeginStep(adios2.StepMode.NextAvailable)
+                found = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout=timeout)
 
         self.init = True
 
         if self.timefile is not None:
             self.start_time = (datetime.datetime.now() - self.start_time).total_seconds()
             self.other_time = datetime.datetime.now()
+
+        return found
 
 
     def __init__(self, filename=None, groupname=None, mode=None, comm=None, step=None, timefile=None):

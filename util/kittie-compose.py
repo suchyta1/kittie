@@ -133,13 +133,13 @@ class KittieJob(cheetah.Campaign):
         self._BlankInit(allscopes_dict, self.config, {})
         self._BlankInit(allscopes_list, self.config, [])
 
-        self.codesetup = self.config['run']
+        self.codesetup = dict(self.config['run'])
         self.codenames = self.codesetup.keys()
-        codescope_list = allscopes_list + ['args', 'options']
-        codescope_dict = allscopes_dict + ['groups']
+        self.codescope_list = allscopes_list + ['args', 'options']
+        self.codescope_dict = allscopes_dict + ['groups']
         for codename in self.codenames:
-            self._BlankInit(codescope_dict, self.codesetup[codename], {})
-            self._BlankInit(codescope_list, self.codesetup[codename], [])
+            self._BlankInit(self.codescope_dict, self.codesetup[codename], {})
+            self._BlankInit(self.codescope_list, self.codesetup[codename], [])
 
 
     def _Unmatched(self, match):
@@ -361,6 +361,31 @@ class KittieJob(cheetah.Campaign):
         self.OrderedDumper.add_representer(collections.OrderedDict, dict_representer)
 
 
+    def GetPlots(self):
+        self.plots = {}
+        for i, codename in enumerate(self.codenames):
+            keys = self.codesetup[codename]['groups'].keys()
+            for i, key in enumerate(keys):
+                entry = self.codesetup[codename]['groups'][key]
+
+                if "plot" in entry:
+
+                    for title in entry['plot'].keys():
+                        self.plots[title] = {}
+                        self.plots[title]['filename'] = entry['filename']
+                        self.plots[title]['engine'] = entry['engine']
+                        self.plots[title]['y'] = entry['plot'][title]['y']
+                        if 'x' in entry['plot'][title]:
+                            self.plots[title]['x'] = entry['plot'][title]['x']
+
+    def WritePlotsFile(self):
+        if len(self.plots.keys()) > 0:
+            outname = os.path.join(self.mainpath, 'kittie-plotter', 'kittie-plots.yaml')
+            outstr = yaml.dump(self.plots, default_flow_style=False, Dumper=self.OrderedDumper)
+            with open(outname, 'w') as out:
+                out.write(outstr)
+
+
     def init(self, yamlfile):
         """
         init() is what does the Cheetah-related setup.
@@ -422,6 +447,16 @@ class KittieJob(cheetah.Campaign):
 
         # Cheetah options that Setup the codes that will lanuch
         self.codes = []
+
+        self.GetPlots()
+        if len(self.plots.keys()) > 0:
+            self.codesetup['kittie-plotter'] = {}
+            self.codesetup['kittie-plotter']['path'] = os.path.join(os.path.dirname(__file__), "kittie-plotter.py")
+            self.codesetup['kittie-plotter']['processes'] = 1
+            self.codesetup['kittie-plotter']['processes-per-node'] = 1
+            self._BlankInit(self.codescope_dict, self.codesetup['kittie-plotter'], {})
+            self._BlankInit(self.codescope_list, self.codesetup['kittie-plotter'], [])
+
 
         for codename in self.codenames:
 
@@ -525,19 +560,20 @@ class KittieJob(cheetah.Campaign):
         return outstr
 
 
+
     def WriteGroupsFile(self):
         for i, codename in enumerate(self.codenames):
             gstrs = []
             pstrs = []
+            params = []
+            values = []
+
             keys = self.codesetup[codename]['groups'].keys()
             names = ["ionames", "nnames = {0}".format(len(keys))]
             for i, key in enumerate(keys):
                 entry = self.codesetup[codename]['groups'][key]
                 gstr = "names({0}) = '{1}'".format(i+1, key)
-
                 nparams = 0
-                params = []
-                values = []
 
                 if "engine" in entry:
                     engine = entry["engine"]
@@ -595,6 +631,7 @@ class KittieJob(cheetah.Campaign):
         self.Link()
         self.WriteCodesFile()
         self.WriteGroupsFile()
+        self.WritePlotsFile()
         self.MoveLog()
 
 
