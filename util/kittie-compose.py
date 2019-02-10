@@ -451,7 +451,7 @@ class KittieJob(cheetah.Campaign):
         self.GetPlots()
         if len(self.plots.keys()) > 0:
             self.codesetup['kittie-plotter'] = {}
-            self.codesetup['kittie-plotter']['path'] = os.path.join(os.path.dirname(__file__), "kittie-plotter.py")
+            self.codesetup['kittie-plotter']['path'] = os.path.join(os.path.dirname(os.path.dirname(__file__)), "plot", "kittie-plotter.py")
             self.codesetup['kittie-plotter']['processes'] = 1
             self.codesetup['kittie-plotter']['processes-per-node'] = 1
             self._BlankInit(self.codescope_dict, self.codesetup['kittie-plotter'], {})

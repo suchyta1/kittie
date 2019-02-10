@@ -116,7 +116,7 @@ class Coupler(object):
             return False
 
 
-    def FileSeek(self, step, timeout=-1):
+    def FileSeek(self, step, timeout=-1.0):
         found = False
         current_step = -1
 
@@ -124,7 +124,7 @@ class Coupler(object):
         self.engine = self.io.Open(self.filename, self.mode)
 
         while True:
-            status = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout=timeout)
+            status = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout)
             if status == adios2.StepStatus.OK:
                 current_step = current_step + 1
             else:
@@ -139,11 +139,11 @@ class Coupler(object):
         self.ReleaseLock()
         if not found:
             self.engine.Close()
-            self.io.RemoveAllVariables()
 
-            #self.groupname = "{0}+".format(self.groupname)
-            #Group(self.groupname)
-            #self.io = ADIOS2.adios.AtIO(self.groupname)
+            #self.io.RemoveAllVariables()
+            self.groupname = "{0}+".format(self.groupname)
+            Group(self.groupname)
+            self.io = ADIOS2.adios.AtIO(self.groupname)
 
             #self.FileSeek(step)
 
@@ -164,7 +164,7 @@ class Coupler(object):
             * The others have basically the same names
     """
 
-    def BeginStep(self, filename=None, groupname=None, mode=None, comm=None, step=None, timefile=None, timeout=-1):
+    def BeginStep(self, filename=None, groupname=None, mode=None, comm=None, step=None, timefile=None, timeout=-1.0):
         if groupname is not None:
             self.groupname = groupname
             self.io = ADIOS2.adios.AtIO(self.groupname)
@@ -219,7 +219,7 @@ class Coupler(object):
             else:
                 if not self.init:
                     self.CoupleOpen()
-                found = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout=timeout)
+                found = self.engine.BeginStep(adios2.StepMode.NextAvailable, timeout)
 
         self.init = True
 
@@ -260,7 +260,11 @@ class Coupler(object):
             self.ReleaseLock()
             if self.mode == adios2.Mode.Read:
                 self.engine.Close()
-                #call adios2_remove_all_variables(helper%io, ierr)
+
+                #self.io.RemoveAllVariables()
+                self.groupname = "{0}+".format(self.groupname)
+                Group(self.groupname)
+                self.io = ADIOS2.adios.AtIO(self.groupname)
 
         if (self.timefile is not None) and (self.comm is not None):
             self.end_time = (datetime.datetime.now() - self.end_time).total_seconds()

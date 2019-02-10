@@ -421,7 +421,7 @@ module kittie
 			integer :: i, rank
 			call adios2_finalize(kittie_adios, ierr)
 			do i=1, size(helpers)
-				if (helpers(i)%rank == 0) then
+				if ((helpers(i)%rank == 0) .and. (helpers(i)%mode == adios2_mode_write)) then
 					call touch_file(trim(helpers(i)%filename)//'.done')
 				end if
 			end do
