@@ -73,15 +73,19 @@ module kittie
 	character(len=128), dimension(:), allocatable :: groupnames, codenames, names, engines
 	character(len=128), dimension(:, :), allocatable :: plots, params, values
 	integer, dimension(:), allocatable :: nplots, nparams
-	character(len=:), allocatable :: myreading
+
+	character(len=:), allocatable :: myreading, app_name
+	character(len=128), dimension(:), allocatable :: allreading
+	logical, dimension(:), allocatable :: readexists
 
 
 	contains
 
 		subroutine kittie_read_helpers_file(filename)
 			character(len=*), intent(in) :: filename
+			character(len=128) :: appname
 			logical :: exists
-			namelist /setup/ ngroupnames
+			namelist /setup/ ngroupnames, appname
 			namelist /helpers_list/ groupnames
 
 			inquire(file=trim(filename), exist=exists)
@@ -95,7 +99,9 @@ module kittie
 				close(iounit)
 			else
 				ngroupnames = 0
+				appname = "unknown"
 			end if
+			app_name = string_copy(appname)
 
 		end subroutine kittie_read_helpers_file
 
@@ -104,7 +110,7 @@ module kittie
 			character(len=*), intent(in) :: filename
 			character(len=128) :: codename
 			logical :: exists
-			integer :: pid
+			integer :: pid, i, j, k
 			namelist /codes/ ncodes, codename
 			namelist /codes_list/ codenames
 
@@ -117,11 +123,19 @@ module kittie
 				open(unit=iounit, file=trim(filename), action='read')
 				read(iounit, nml=codes_list)
 				close(iounit)
+
+				myreading = string_copy(reading // '-' // trim(codename))
+				allocate(allreading(ncodes))
+				do i=1, ncodes
+					allreading(i) = trim(reading) // '-' // trim(codenames(i))
+				end do
 			else
-				pid = getpid()
-				write(codename, "(I0)") pid
+				codename = ""
+				myreading = string_copy(reading)
+				ncodes = 1
+				allocate(allreading(ncodes))
+				allreading(1) = trim(reading)
 			end if
-			myreading = string_copy(reading // '-' // trim(codename))
 
 		end subroutine kittie_read_codes_file
 
@@ -141,7 +155,6 @@ module kittie
 
 		subroutine kittie_read_groups_file(filename)
 			character(len=*), intent(in) :: filename
-			character(len=128) :: codename
 			logical :: exists
 			integer :: maxsize, maxparams, i, ierr
 			type(adios2_io) :: io
@@ -149,6 +162,7 @@ module kittie
 			namelist /ionames_list/ names, engines, nplots, nparams
 			namelist /plots_list/ plots
 			namelist /params_list/ params, values
+
 			inquire(file=trim(filename), exist=exists)
 
 			if (exists) then
@@ -184,12 +198,63 @@ module kittie
 		end subroutine kittie_read_groups_file
 
 
+		subroutine wlock(wfile)
+			character(len=*), intent(in) :: wfile
+			logical :: exists
+			inquire(file=trim(wfile), exist=exists)
+			if (.not. exists) then
+				call touch_file(wfile)
+			end if
+		end subroutine wlock
+
+		subroutine nothing_writing(wfile)
+			character(len=*), intent(in) :: wfile
+			logical :: exists
+			inquire(file=trim(wfile), exist=exists)
+			do while(exists)
+				inquire(file=trim(wfile), exist=exists)
+			end do
+		end subroutine nothing_writing
+
+		subroutine nothing_reading(helper)
+			type(coupling_helper), intent(in) :: helper
+			integer :: i
+			character(len=512) :: rfile
+			logical :: readexists
+			do i=1, ncodes
+				rfile = trim(helper%filename) // trim(allreading(i))
+				inquire(file=trim(rfile), exist=readexists)
+				do while(readexists)
+					inquire(file=trim(rfile), exist=readexists)
+				end do
+			end do
+		end subroutine
+
+		subroutine wait_data_existence(helper)
+			type(coupling_helper), intent(in) :: helper
+			logical :: exists
+			inquire(file=trim(helper%filename), exist=exists)
+			do while(.not.exists) 
+				inquire(file=trim(helper%filename), exist=exists)
+			end do
+		end subroutine wait_data_existence
+
+		subroutine rlock(rfile)
+			character(len=*), intent(in) :: rfile
+			logical :: exists
+			inquire(file=trim(rfile), exist=exists)
+			if (.not. exists) then
+				call touch_file(rfile)
+			end if
+		end subroutine rlock
+
 
 		recursive subroutine until_nonexistent(helper, verify_level)
 			type(coupling_helper), intent(in) :: helper
 			integer, intent(in), optional :: verify_level
-			logical :: rexists, wexists, redo
-			integer :: v, vlevel
+			logical :: rexists, wexists, redo, found
+			integer :: v, vlevel, i
+			character(len=512) :: rfile, wfile
 
 			if (present(verify_level)) then
 				vlevel = verify_level
@@ -198,44 +263,26 @@ module kittie
 			end if
 			redo = .false.
 
-			do while (.true.)
-
-				if (helper%mode == adios2_mode_read) then
-					inquire(file=trim(helper%filename), exist=rexists)
-					if (.not.rexists) then
-						cycle
-					end if
-				end if
-
-				inquire(file=trim(helper%filename)//myreading, exist=rexists)
-				inquire(file=trim(helper%filename)//writing, exist=wexists)
-
-				if (rexists .and. wexists) then
-					if  (helper%mode == adios2_mode_read) then
-						call delete_existing(helper%filename//myreading)
-					end if
-					cycle
-				else if (rexists .or. wexists) then
-					cycle
-				else
-					exit
-				end if
-
-			end do
+			wfile = trim(helper%filename) // writing
 
 			if (helper%mode == adios2_mode_write) then
-				call touch_file(trim(helper%filename)//writing)
+				call wlock(wfile)
+				call nothing_reading(helper)
+			else
+				rfile = trim(helper%filename) // myreading
+				call wait_data_existence(helper)
+				call nothing_writing(wfile)
+				call rlock(rfile)
 
-			else if (helper%mode == adios2_mode_read) then
-				call touch_file(trim(helper%filename)//myreading)
 				do v=1, vlevel
-					inquire(file=trim(helper%filename)//writing, exist=wexists)
+					inquire(file=trim(wfile), exist=wexists)
 					if (wexists) then
-						call delete_existing(helper%filename//myreading)
+						call delete_existing(rfile)
 						redo = .true.
 						exit
 					end if
 				end do
+
 			end if
 
 			if (redo) then
@@ -428,6 +475,29 @@ module kittie
 		end subroutine kittie_finalize
 
 
+		function setup_file() result(filename)
+			logical :: stripped
+			character(len=512) :: appfile
+			character(len=:), allocatable :: filename
+			integer :: i
+
+			stripped = .false.
+			call get_command_argument(0, appfile)
+			do i=len_trim(appfile), 1, -1
+				if (trim(appfile(i:i)) == '/') then
+					filename = string_copy(trim(appfile(1:i)) // ".kittie-setup.nml")
+					stripped = .true.
+					exit
+				end if
+			end do
+
+			if (.not.stripped) then
+				filename = string_copy(".kittie-setup.nml")
+			end if
+
+		end function setup_file
+
+
 #		ifdef USE_MPI
 
 			subroutine kittie_initialize(comm, ierr, xml)
@@ -435,10 +505,7 @@ module kittie
 				integer, intent(in)  :: comm
 				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
-
-				character(len=128) :: filename
-				logical :: exists
-				integer :: pid
+				character(len=:), allocatable :: filename
 
 				if (present(xml)) then
 					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, ierr)
@@ -446,9 +513,11 @@ module kittie
 					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
 				end if
 
-				call kittie_read_helpers_file("kittie_groupnames.nml")
-				call kittie_read_codes_file("kittie_codenames.nml")
-				call kittie_read_groups_file("kittie_groups.nml")
+				filename = setup_file()
+				call kittie_read_helpers_file(filename)
+				call kittie_read_codes_file(".kittie-codenames-" // trim(app_name) // ".nml")
+				call kittie_read_groups_file(  ".kittie-groups-" // trim(app_name) // ".nml")
+				deallocate(filename)
 
 			end subroutine kittie_initialize
 

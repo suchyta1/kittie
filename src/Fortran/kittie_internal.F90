@@ -58,7 +58,7 @@ module kittie_internal
 
 		subroutine touch_file(fname)
 			character(len=*), intent(in) :: fname
-			open(unit=iounit, file=fname, status='new')
+			open(unit=iounit, file=trim(fname), status='new')
 			close(iounit)
 		end subroutine touch_file
 

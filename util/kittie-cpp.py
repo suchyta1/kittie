@@ -8,6 +8,8 @@ import re
 import copy
 import subprocess
 
+import kittie_common
+
 
 class KittieParser(object):
 
@@ -426,14 +428,18 @@ class KittieParser(object):
         return groups
 
 
-    def WriteGroupsFile(self, groups, outdir):
+    def WriteGroupsFile(self, groups, outdir, name):
+        scalars = "ngroupnames = {0}{1}appname = '{2}'".format(len(groups), '\n', name)
+        setup = ["setup", scalars]
+
         gstrs = []
         for i, group in enumerate(groups):
             gstrs.append("groupnames({0}) = {1}".format(i+1, group))
-        outstrs = ["&setup", "ngroupnames = {0}".format(len(groups)), "/", "&helpers_list", '\n'.join(gstrs), "/\n"]
-        outstr = "\n\n".join(outstrs)
-        with open(os.path.join(outdir, "kittie_groupnames.nml"), 'w') as out:
-            out.write(outstr)
+        gstrs = '\n'.join(gstrs)
+        gsetup = ["helpers_list", gstrs]
+
+        outstr = kittie_common.Namelist(setup, gsetup)
+        kittie_common.NMLFile("kittie-setup", outdir, outstr)
 
 
 if __name__ == "__main__":
@@ -446,6 +452,7 @@ if __name__ == "__main__":
     RepoParser.add_argument("directory", help="Code repository to look through for KITTIE markups")
     RepoParser.add_argument("outdir", help="Output groups namelist file")
     RepoParser.add_argument("-s", "--suffix", help="String to append to file names when replaced", type=str, default="-kittie")
+    RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
     RepoParser.set_defaults(which='repo')
 
     FileParser = subparsers.add_parser("file", help="Process one source file and replace KITTIE markups with appropriate APIs")
@@ -474,4 +481,7 @@ if __name__ == "__main__":
                 groups = fparser.FindGroups(groups)
                 fparser.FileReplacements()
 
-        fparser.WriteGroupsFile(groups, args.outdir)
+        if args.name is None:
+            args.name = os.path.basename(args.directory)
+
+        fparser.WriteGroupsFile(groups, args.outdir, args.name)

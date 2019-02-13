@@ -25,6 +25,8 @@ import yaml
 import collections
 from collections import OrderedDict
 
+import kittie_common
+
 
 def dict_representer(dumper, data):
     return dumper.represent_dict(data.items())
@@ -117,6 +119,7 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config, 'rundir', 'kittie-run')
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job')
         self._SetIfNotFound(self.config, 'walltime', 1800, level=logging.WARNING)
+        self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
 
         self._SetIfNotFound(self.config, 'machine', level=logging.ERROR)
         self._SetIfNotFound(self.config['machine'], 'name', level=logging.ERROR)
@@ -363,6 +366,9 @@ class KittieJob(cheetah.Campaign):
 
     def GetPlots(self):
         self.plots = {}
+        if self.launchmode == "MPMD":
+            self.plots['mpmd'] = len(self.codenames)
+
         for i, codename in enumerate(self.codenames):
             keys = self.codesetup[codename]['groups'].keys()
             for i, key in enumerate(keys):
@@ -380,10 +386,27 @@ class KittieJob(cheetah.Campaign):
 
     def WritePlotsFile(self):
         if len(self.plots.keys()) > 0:
-            outname = os.path.join(self.mainpath, 'kittie-plotter', 'kittie-plots.yaml')
+            if self.launchmode == "MPMD":
+                outname = os.path.join(self.mainpath, 'kittie-plots.yaml')
+            else:
+                outname = os.path.join(self.mainpath, 'kittie-plotter', 'kittie-plots.yaml')
+
             outstr = yaml.dump(self.plots, default_flow_style=False, Dumper=self.OrderedDumper)
             with open(outname, 'w') as out:
                 out.write(outstr)
+
+
+    def GetAppName(self, setupfile):
+        with open(setupfile, 'r') as infile:
+            nmltxt = infile.read()
+        pattern = "^appname\s*=\s*(.*)$"
+        search = re.compile(pattern, re.MULTILINE)
+        results = search.search(nmltxt)
+
+        if results is None:
+            raise ValueError("Did not find appname in {0}".format(setupfile))
+        name = results.group(1).strip("'").strip('"')
+        return name
 
 
     def init(self, yamlfile):
@@ -410,7 +433,7 @@ class KittieJob(cheetah.Campaign):
                 self._MakeReplacements(include=True)
             except(KeyError):
                 pass
-        for filename in self.config['include']:
+        for filename in self.config[self.keywords['include']]:
             with open(filename, 'r') as ystream:
                 self.config.update(yaml.load(ystream), Loader=self.OrderedLoader)
 
@@ -424,8 +447,8 @@ class KittieJob(cheetah.Campaign):
 
 
         # Global Cheetah keywords
-        self.output_dir = os.path.join(self.config['rundir'], self.cheetahdir)
-        self.name = self.config['jobname']
+        self.output_dir = os.path.join(self.config[self.keywords['rundir']], self.cheetahdir)
+        self.name = self.config[self.keywords['jobname']]
 
 
         # These are my own things, not Cheetah things per se, but are convenient to work with the Cheetah output
@@ -448,6 +471,13 @@ class KittieJob(cheetah.Campaign):
         # Cheetah options that Setup the codes that will lanuch
         self.codes = []
 
+        if self.config[self.keywords['mpmd']]:
+            self.launchmode = 'MPMD'
+            subdirs = False
+        else:
+            self.launchmode = 'default'
+            subdirs = True
+
         self.GetPlots()
         if len(self.plots.keys()) > 0:
             self.codesetup['kittie-plotter'] = {}
@@ -463,6 +493,14 @@ class KittieJob(cheetah.Campaign):
             codedict = {}
             codedict['exe'] = self.codesetup[codename]['path']
             self.codes.append((codename, codedict))
+
+            self.codesetup[codename]['setup-file'] = os.path.join(os.path.dirname(self.codesetup[codename]['path']), ".kittie-setup.nml")
+            if codename != "kittie-plotter":
+                if not os.path.exists(self.codesetup[codename]['setup-file']):
+                    raise ValueError("{0} {1}/.kittie-setup file does not exist".format(codename, codedict['exe']))
+                self.codesetup[codename]['appname'] = self.GetAppName(self.codesetup[codename]['setup-file'])
+            else:
+                self.codesetup[codename]['appname'] = "kittie-plotter"
 
 
             # Set the number of processes
@@ -485,7 +523,7 @@ class KittieJob(cheetah.Campaign):
         sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
 
         # A sweepgroup runs a sweep by submiting a single job. There could be more than one sweepgroup, given by the sweeps list attribute, which would submit mutliple inpedent jobs.
-        sweepgroup = cheetah.parameters.SweepGroup(self.groupname, walltime=self.config['walltime'], parameter_groups=[sweep], component_subdirs=True)
+        sweepgroup = cheetah.parameters.SweepGroup(self.groupname, walltime=self.config[self.keywords['walltime']], parameter_groups=[sweep], component_subdirs=subdirs, launch_mode=self.launchmode)
         self.sweeps = [sweepgroup]
 
 
@@ -505,7 +543,10 @@ class KittieJob(cheetah.Campaign):
         self._Copy(self.config, self.mainpath)
 
         for codename in self.codenames:
-            codepath = os.path.join(self.mainpath, codename)
+            if self.launchmode == "MPMD":
+                codepath = os.path.join(self.mainpath)
+            else:
+                codepath = os.path.join(self.mainpath, codename)
             self._Copy(self.codesetup[codename], codepath)
 
 
@@ -518,7 +559,12 @@ class KittieJob(cheetah.Campaign):
         """
         self._DoCommands(self.mainpath, self.config)
         for codename in self.config['run']:
-            self._DoCommands(os.path.join(self.mainpath, codename), self.config['run'][codename])
+            if self.launchmode == "MPMD":
+                path = self.mainpath
+            else:
+                path = os.path.join(self.mainpath, codename)
+            self._DoCommands(path, self.config['run'][codename])
+
 
 
     def Link(self):
@@ -531,12 +577,20 @@ class KittieJob(cheetah.Campaign):
 
         os.chdir(self.mainpath)
         mainlist = os.listdir(self.mainpath)
-        for name in mainlist:
-            if name.startswith('codar.cheetah.') or name.startswith('.codar.cheetah.') or  (name == "tau.conf"):
-                continue
-            linksrc = os.path.join(self.cheetahdir, self.cheetahsub, name)
-            linkpath = os.path.join(self.config['rundir'], name)
+
+        if self.launchmode == "MPMD":
+            linksrc = os.path.join(self.cheetahdir, self.cheetahsub)
+            linkpath = os.path.join(self.config[self.keywords['rundir']], "run")
             os.symlink(linksrc, linkpath)
+
+        else:
+            for name in mainlist:
+                if name.startswith('codar.cheetah.') or name.startswith('.codar.cheetah.') or  (name == "tau.conf"):
+                    continue
+                linksrc = os.path.join(self.cheetahdir, self.cheetahsub, name)
+                linkpath = os.path.join(self.config[self.keywords['rundir']], name)
+                os.symlink(linksrc, linkpath)
+
 
 
     def MoveLog(self):
@@ -544,7 +598,7 @@ class KittieJob(cheetah.Campaign):
         If we get here, we've successfully built a cheetah job. Move the Kittie log into the output directory
         """
 
-        outlog = os.path.join(self.config['rundir'], "kittie-setup-{0}".format(os.path.basename(self.logfile)) )
+        outlog = os.path.join(self.config[self.keywords['rundir']], "kittie-setup-{0}".format(os.path.basename(self.logfile)) )
         shutil.move(self.logfile, outlog)
         checkdir = os.path.dirname(self.logfile)
         remaining = os.listdir(checkdir)
@@ -552,17 +606,11 @@ class KittieJob(cheetah.Campaign):
             shutil.rmtree(checkdir)
 
 
-    def Namelist(self, *args):
-        groups = []
-        for arg in args:
-            groups += ["&{0}{2}{1}{2}/\n".format(arg[0], arg[1], '\n\n')]
-        outstr = "\n".join(groups)
-        return outstr
-
-
-
     def WriteGroupsFile(self):
         for i, codename in enumerate(self.codenames):
+            if codename == "kittie-plotter":
+                continue
+
             gstrs = []
             pstrs = []
             params = []
@@ -604,21 +652,24 @@ class KittieJob(cheetah.Campaign):
             names_list = ["ionames_list", '\n'.join(gstrs)]
             plots_list = ["plots_list", '\n'.join(pstrs)]
             params_list = ["params_list", '\n'.join(params+values)]
-
-            outstr = self.Namelist(names, names_list, plots_list, params_list)
-            with open(os.path.join(self.mainpath, codename, "kittie_groups.nml"), 'w') as out:
-                out.write(outstr)
+            outstr = kittie_common.Namelist(names, names_list, plots_list, params_list)
+            kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
 
 
     def WriteCodesFile(self):
         gstrs = []
         for i, code in enumerate(self.codenames):
             gstrs.append("codenames({0}) = '{1}'".format(i+1, code))
+        gstrs = '\n'.join(gstrs)
+
         for codename in self.codenames:
-            outstrs = ["&codes", "ncodes = {0}{1}codename = '{2}'".format(len(self.codenames), '\n', codename), "/", "&codes_list", '\n'.join(gstrs), "/\n"]
-            outstr = "\n\n".join(outstrs)
-            with open(os.path.join(self.mainpath, codename, "kittie_codenames.nml"), 'w') as out:
-                out.write(outstr)
+            if codename == "kittie-plotter":
+                continue
+            nstrs = "ncodes = {0}{1}codename = '{2}'".format(len(self.codenames), '\n', codename)
+            nlist = ["codes", nstrs]
+            glist = ["codes_list", gstrs]
+            outstr = kittie_common.Namelist(nlist, glist)
+            kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
 
 
     def __init__(self, yamlfile):

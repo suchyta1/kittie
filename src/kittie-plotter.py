@@ -78,23 +78,25 @@ class PlotHelper(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
+    helpers = []
+    comm = MPI.COMM_WORLD
 
     with open("kittie-plots.yaml", 'r') as ystream:
         config = yaml.load(ystream)
 
-    comm = MPI.COMM_WORLD
-    #comm = None
-    kittie.Initialize(comm=comm)
-    helpers = []
+    if "mpmd" in config:
+        rank = comm.Get_rank()
+        comm = comm.Split(config["mpmd"], rank)
+        del config["mpmd"]
 
+    kittie.Initialize(comm=comm)
     for i, name in enumerate(config.keys()):
         helpers += [PlotHelper(name, config[name])]
-    done = np.zeros(len(helpers), dtype=np.int)
 
-    if not os.path.exists("images"):
+    if not os.path.lexists("images"):
         os.makedirs("images")
 
-
+    done = np.zeros(len(helpers), dtype=np.int)
     while True:
 
         if np.sum(done) == len(done):
@@ -102,7 +104,7 @@ if __name__ == "__main__":
 
         for i in range(len(helpers)):
 
-            if done[i] or (not os.path.exists(helpers[i].filename)):
+            if (done[i] == 1) or (not os.path.lexists(helpers[i].filename)):
                 continue
 
             found = helpers[i].helper.BeginStep(filename=helpers[i].filename, groupname=helpers[i].helper.groupname, mode=adios2.Mode.Read, comm=comm, step=helpers[i].step, timeout=0.0)
@@ -112,6 +114,6 @@ if __name__ == "__main__":
                 helpers[i].step += 1
             else:
                 fname = "{0}.done".format(helpers[i].filename)
-                if os.path.exists(fname):
-                    done[i] = True
+                if os.path.lexists(fname):
+                    done[i] = 1
 

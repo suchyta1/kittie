@@ -51,10 +51,10 @@ class Coupler(object):
         while True:
 
             if self.mode == adios2.Mode.Read:
-                if not os.path.exists(self.filename):
+                if not os.path.lexists(self.filename):
                     continue
-            rexists = os.path.exists("{0}{1}".format(self.filename, self.reading))
-            wexists = os.path.exists("{0}{1}".format(self.filename, self.writing))
+            rexists = os.path.lexists("{0}{1}".format(self.filename, self.reading))
+            wexists = os.path.lexists("{0}{1}".format(self.filename, self.writing))
 
             if rexists and wexists:
                 if self.mode == adios2.Mode.Read:
@@ -72,7 +72,7 @@ class Coupler(object):
             open("{0}{1}".format(self.filename, self.reading), "w").close()
 
             for v in range(verify_level):
-                if os.path.exists("{0}{1}".format(self.filename, self.writing)):
+                if os.path.lexists("{0}{1}".format(self.filename, self.writing)):
                     os.remove("{0}{1}".format(self.filename, self.reading))
                     redo = True
                     break
