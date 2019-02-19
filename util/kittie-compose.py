@@ -676,7 +676,11 @@ class KittieJob(cheetah.Campaign):
         self.LoggerSetup()
         self.init(yamlfile)
         super(KittieJob, self).__init__(self.machine, "")
+
+        if self.config['machine']['runner_extra'] is None:
+            self.config['machine']['runner_extra'] = ""
         self.make_experiment_run_dir(self.output_dir, runner_extra=self.config['machine']['runner_extra'])
+
         self.Copy()
         self.PreSubmitCommands()
         self.Link()
