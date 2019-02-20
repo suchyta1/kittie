@@ -7,13 +7,15 @@ import datetime
 import os
 import copy
 import numpy as np
+import yaml
 
 
 class ADIOS2(object):
     adios = None
+    config = None
 
 
-def Initialize(comm=None, xml=None):
+def Initialize(comm=None, xml=None, appname=None):
     args = [adios2.DebugON]
     if comm is not None:
         args.insert(0, comm)
@@ -21,11 +23,16 @@ def Initialize(comm=None, xml=None):
         args.insert(0, xml)
     ADIOS2.adios = adios2.ADIOS(*args)
 
+    if appname is not None:
+        yamlfile = ".kittie-setup-{0}.yaml".format(appname)
+        with open(yamlfile, 'r') as ystream:
+            ADIOS2.config = yaml.load(ystream)
+
 
 class Group(object):
 
-    def __init__(self, groupname, engine=None):
-        self.io = ADIOS2.adios.DeclareIO(groupname)
+    def _SetEngine(self, engine):
+
         if type(engine) is str:
             self.io.SetEngine(engine)
         elif type(engine) is dict:
@@ -33,6 +40,19 @@ class Group(object):
             e = copy.copy(engine)
             del e['name']
             self.io.SetParameters(e)
+
+
+    def __init__(self, groupname, engine=None):
+        self.io = ADIOS2.adios.DeclareIO(groupname)
+
+        if ADIOS2.config is not None:
+            if groupname in ADIOS2.config:
+                newengine = ADIOS2.config[groupname]['engine']
+                if type(newengine) is not str:
+                    newengine = dict(newengine)
+                self._SetEngine(newengine)
+
+        self._SetEngine(engine)
 
 
     def DefineVariable(self, name, gdims, odims, ldims, dtype):
@@ -140,10 +160,12 @@ class Coupler(object):
         if not found:
             self.engine.Close()
 
-            #self.io.RemoveAllVariables()
+            self.io.RemoveAllVariables()
+            """
             self.groupname = "{0}+".format(self.groupname)
             Group(self.groupname)
             self.io = ADIOS2.adios.AtIO(self.groupname)
+            """
 
             #self.FileSeek(step)
 
@@ -261,10 +283,12 @@ class Coupler(object):
             if self.mode == adios2.Mode.Read:
                 self.engine.Close()
 
-                #self.io.RemoveAllVariables()
+                self.io.RemoveAllVariables()
+                """
                 self.groupname = "{0}+".format(self.groupname)
                 Group(self.groupname)
                 self.io = ADIOS2.adios.AtIO(self.groupname)
+                """
 
         if (self.timefile is not None) and (self.comm is not None):
             self.end_time = (datetime.datetime.now() - self.end_time).total_seconds()

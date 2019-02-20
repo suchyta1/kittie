@@ -674,6 +674,23 @@ class KittieJob(cheetah.Campaign):
             kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
 
 
+    def WriteOutYAML(self):
+        outdict = {}
+        for i, codename in enumerate(self.codenames):
+            if len(self.codesetup[codename]['groups']) > 0:
+                outdict = self.codesetup[codename]['groups']
+                outstr = yaml.dump(outdict, default_flow_style=False)
+
+                if self.launchmode == "default":
+                    outdir = os.path.join(self.mainpath, codename)
+                else:
+                    outdir = self.mainpath
+
+                with open(os.path.join(outdir, ".kittie-setup-{0}.yaml".format(self.codesetup[codename]['appname'])), 'w') as outfile:
+                    outfile.write(outstr)
+
+
+
     def __init__(self, yamlfile):
         self.LoggerSetup()
         self.init(yamlfile)
@@ -686,9 +703,12 @@ class KittieJob(cheetah.Campaign):
         self.Copy()
         self.PreSubmitCommands()
         self.Link()
+
         self.WriteCodesFile()
         self.WriteGroupsFile()
         self.WritePlotsFile()
+        self.WriteOutYAML()
+
         self.MoveLog()
 
 
