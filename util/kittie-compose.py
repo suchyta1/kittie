@@ -497,8 +497,10 @@ class KittieJob(cheetah.Campaign):
             self.codesetup[codename]['setup-file'] = os.path.join(os.path.dirname(self.codesetup[codename]['path']), ".kittie-setup.nml")
             if codename != "kittie-plotter":
                 if not os.path.exists(self.codesetup[codename]['setup-file']):
-                    raise ValueError("{0} {1}/.kittie-setup file does not exist".format(codename, codedict['exe']))
-                self.codesetup[codename]['appname'] = self.GetAppName(self.codesetup[codename]['setup-file'])
+                    if 'appname' not in self.codesetup[codename]:
+                        raise ValueError("{0} {1}/.kittie-setup file does not exist".format(codename, codedict['exe']))
+                else:
+                    self.codesetup[codename]['appname'] = self.GetAppName(self.codesetup[codename]['setup-file'])
             else:
                 self.codesetup[codename]['appname'] = "kittie-plotter"
 
