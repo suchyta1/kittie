@@ -15,6 +15,7 @@ module kittie_internal
 		logical :: use_mpi=.false.
 #	endif
 
+	logical :: touch = .false.
 	integer :: iounit=2018
 
 	! This is the namespace all the Kittie ADIOS-2 I/O lives in. Nicely, this will be completely independent of anything else ADIOS-2.
@@ -58,8 +59,12 @@ module kittie_internal
 
 		subroutine touch_file(fname)
 			character(len=*), intent(in) :: fname
-			open(unit=iounit, file=trim(fname), status='new')
-			close(iounit)
+			if (touch) then
+				call execute_command_line("touch " // trim(fname))
+			else
+				open(unit=iounit, file=trim(fname), status='new')
+				close(iounit)
+			end if
 		end subroutine touch_file
 
 

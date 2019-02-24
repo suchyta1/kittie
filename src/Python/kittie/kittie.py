@@ -8,11 +8,13 @@ import os
 import copy
 import numpy as np
 import yaml
+import subprocess
 
 
 class ADIOS2(object):
     adios = None
     config = None
+    touch = False
 
 
 def Initialize(comm=None, xml=None, appname=None):
@@ -86,10 +88,16 @@ class Coupler(object):
                 break
 
         if self.mode == adios2.Mode.Write:
-            open("{0}{1}".format(self.filename, self.writing), "w").close()
+            if ADIOS2.touch:
+                subprocess.call(["touch", "{0}{1}".format(self.filename, self.writing)])
+            else:
+                open("{0}{1}".format(self.filename, self.writing), "w").close()
 
         elif self.mode == adios2.Mode.Read:
-            open("{0}{1}".format(self.filename, self.reading), "w").close()
+            if ADIOS2.touch:
+                subprocess.call(["touch", "{0}{1}".format(self.filename, self.reading)])
+            else:
+                open("{0}{1}".format(self.filename, self.reading), "w").close()
 
             for v in range(verify_level):
                 if os.path.lexists("{0}{1}".format(self.filename, self.writing)):
