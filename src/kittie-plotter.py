@@ -2,8 +2,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 import yaml
-#import kittie
-import kittie.kittie as kittie
+import kittie
 import adios2
 import numpy as np
 import argparse
