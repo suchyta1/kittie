@@ -126,6 +126,7 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config['machine'], 'job_setup', value=None, level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'submit_setup', value=None, level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'runner_extra', value="", level=logging.INFO)
+        self._SetIfNotFound(self.config['machine'], 'script', value=None, level=logging.INFO)
 
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
 
@@ -478,6 +479,10 @@ class KittieJob(cheetah.Campaign):
             self.launchmode = 'default'
             subdirs = True
 
+        if self.config['machine'][self.keywords['script']] is not None:
+            self.launchmode = 'default'
+            subdirs = False
+
         self.GetPlots()
         if len(self.plots.keys()) > 0:
             self.codesetup['kittie-plotter'] = {}
@@ -690,6 +695,13 @@ class KittieJob(cheetah.Campaign):
                     outfile.write(outstr)
 
 
+    def FromScript(self):
+        if self.config['machine'][self.keywords['script']] is not None:
+            with open(os.path.join(self.mainpath, ".kittie-script.sh"), 'w') as outfile:
+                outfile.write('cd {0}\n'.format(self.mainpath))
+                outfile.write('bsub {0}'.format(self.config['machine'][self.keywords['script']]))
+
+
 
     def __init__(self, yamlfile):
         self.LoggerSetup()
@@ -700,6 +712,9 @@ class KittieJob(cheetah.Campaign):
             self.config['machine']['runner_extra'] = ""
         self.make_experiment_run_dir(self.output_dir, runner_extra=self.config['machine']['runner_extra'])
 
+        if self.config['machine'][self.keywords['script']] is not None:
+            self.launchmode = 'MPMD'
+
         self.Copy()
         self.PreSubmitCommands()
         self.Link()
@@ -708,6 +723,8 @@ class KittieJob(cheetah.Campaign):
         self.WriteGroupsFile()
         self.WritePlotsFile()
         self.WriteOutYAML()
+
+        self.FromScript()
 
         self.MoveLog()
 

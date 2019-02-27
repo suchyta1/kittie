@@ -2,7 +2,10 @@
 
 mydir=$PWD
 
-cd $1/.cheetah/$USER
-./run-all.sh;
-cd $mydir
-
+if [ -f $1/run/.kittie-script.sh ]; then
+	source $1/run/.kittie-script.sh
+else
+	cd $1/.cheetah/$USER
+	./run-all.sh;
+	cd $mydir
+fi

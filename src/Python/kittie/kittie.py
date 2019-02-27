@@ -14,7 +14,7 @@ import subprocess
 class ADIOS2(object):
     adios = None
     config = None
-    touch = False
+    touch = True
 
 
 def Initialize(comm=None, xml=None, appname=None):
