@@ -558,6 +558,26 @@ module kittie
 		end subroutine kittie_declare_io
 
 
+		function KittieDeclareIO(groupname, ierr) result(io)
+			! Initialize a new Kittie coupling I/O group
+			character(len=*), intent(in) :: groupname
+			integer, intent(out) :: ierr
+			integer :: i, j
+			type(adios2_io) :: io
+			call adios2_declare_io(io, kittie_adios, trim(groupname), ierr)
+			do i=1, nnames
+				if ((trim(names(i)) == trim(groupname)) .and. (trim(engines(i)) /= "")) then
+					call adios2_set_engine(io, trim(engines(i)), ierr)
+				end if
+
+				do j=1, nparams(i)
+					call adios2_set_parameter(io, params(i, j), values(i, j), ierr)
+				end do
+
+			end do
+		end function KittieDeclareIO
+
+
 		subroutine kittie_define_variable(groupname, varname, dtype, ndims, global_dims, global_offsets, local_dims, ierr, constant_dims)
 			! At least for now, it makes sense to basically use the ADIOS-2 API
 

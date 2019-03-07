@@ -263,13 +263,16 @@ class KittieParser(object):
         return commanddict
 
 
-    def CommonNoOptions(self, commanddict, keydict, command, text, args, newargs, kittie_command):
+    def CommonNoOptions(self, commanddict, keydict, command, text, args, newargs, kittie_command, result=None):
         start, stop = self.ParseCommand(command, text)
         if start is not None:
             commanddict = self.GetAdiosArgs(text[start:stop], commanddict, args)
             commanddict = self.CommandKeyAdd(newargs, keydict, commanddict)
             if self.filetype == self.knowntypes['fortran']:
-                txt = "call {0}(".format(kittie_command)
+                if result is None:
+                    txt = "call {0}(".format(kittie_command)
+                else:
+                    txt = "{0} = {1}(".format(commanddict[result], kittie_command)
                 for key in newargs:
                     txt = "{0}{1}, ".format(txt, commanddict[key])
                 txt = "{0})".format(txt.rstrip(', '))
@@ -312,7 +315,8 @@ class KittieParser(object):
 
     def ReplaceDeclareIO(self, between, commanddict, keydict):
         if self.filetype == self.knowntypes['fortran']:
-            between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "kittie_declare_io")
+            #between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "kittie_declare_io")
+            between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "KittieDeclareIO", result='io')
         return between, commanddict, start
 
     def ReplaceEndStep(self, between, commanddict, keydict):
