@@ -56,7 +56,7 @@ module kittie
 
 		logical :: timed=.false., timeinit=.false.
 		character(len=:), allocatable :: timingfile, timinggroup
-		real(8), dimension(1) :: starttime, endtime, othertime
+		real(8), dimension(1) :: starttime, endtime, othertime, totaltime
 		type(adios2_engine) :: timeengine
 		type(adios2_io) :: timingio
 
@@ -363,11 +363,13 @@ module kittie
 			end if
 
 			if (helper%timed .and. use_mpi) then
+				helper%totaltime(1) = mpi_wtime() - helper%totaltime(1)
 				helper%endtime(1) = mpi_wtime() - helper%endtime(1)
 				call adios2_begin_step(helper%timeengine, adios2_step_mode_append, ierr)
 				call adios2_put(helper%timeengine, "start", helper%starttime, ierr)
 				call adios2_put(helper%timeengine, "end",   helper%endtime,   ierr)
 				call adios2_put(helper%timeengine, "other", helper%othertime, ierr)
+				call adios2_put(helper%timeengine, "total", helper%totaltime, ierr)
 				call adios2_end_step(helper%timeengine, ierr)
 			end if
 
@@ -830,6 +832,7 @@ module kittie
 					call kittie_define_variable(trim(helper%timinggroup), "start",  adios2_type_dp, 1, gdims, offs, locs, iierr)
 					call kittie_define_variable(trim(helper%timinggroup), "end", adios2_type_dp, 1, gdims, offs, locs, iierr)
 					call kittie_define_variable(trim(helper%timinggroup), "other", adios2_type_dp, 1, gdims, offs, locs, iierr)
+					call kittie_define_variable(trim(helper%timinggroup), "total", adios2_type_dp, 1, gdims, offs, locs, iierr)
 					call adios2_at_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
 
 #					ifdef USE_MPI
@@ -841,6 +844,7 @@ module kittie
 					helper%timeinit = .true.
 				end if
 				helper%starttime(1) = mpi_wtime()
+				helper%totaltime(1) = mpi_wtime()
 			else
 				helper%timed = .false.
 			end if
