@@ -34,6 +34,11 @@ class KittieParser(object):
         return command[self.filetype]
 
     @property
+    def CloseCommand(self):
+        command = {self.knowntypes['python']: '', self.knowntypes['fortran']: 'adios2_close'}
+        return command[self.filetype]
+
+    @property
     def DefineCommand(self):
         command = {self.knowntypes['python']: '', self.knowntypes['fortran']: 'adios2_define_variable'}
         return command[self.filetype]
@@ -83,6 +88,7 @@ class KittieParser(object):
 
 
     def __init__(self, filename, outfilename):
+        self.AddStep = False
         self.filename = os.path.realpath(filename)
         self.outfilename = os.path.realpath(outfilename)
         self.DetectFiletype()
@@ -185,7 +191,11 @@ class KittieParser(object):
             keydict = copy.copy(self.keydict)
         kvs = text.split(",")
         for kv in kvs:
-            key, value = kv.strip().split("=")
+            k = kv.strip()
+            key, value = k.split("=")
+            if (key == "step") and (value == "None"):
+                self.AddStep = True
+                continue
             if key in self.keywords:
                 keydict[key] = value
 
@@ -283,9 +293,35 @@ class KittieParser(object):
     def ReplaceOpen(self, between, commanddict, keydict):
         start, stop = self.ParseCommand(self.OpenCommand, between)
         if start is not None:
-            commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'io', 'filename', 'mode', 'comm', 'ierr'])
+            commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'io', 'filename', 'open_mode', 'comm', 'ierr'])
             txt = '{0}{1}'.format(self.InitStr[0], between[start:stop])
-            between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+
+            if self.AddStep:
+                if commanddict['open_mode'] == "adios2_mode_read":
+                    keydict["step"] = 0
+
+                argstr = "common_helper, {0}, {1}, {2}, {3}".format(commanddict['filename'], commanddict['group'], commanddict['open_mode'], commanddict['comm'])
+                for name in ["step", "ierr", "dir", "timefile"]:
+                    argstr = self.OptionAdd(name, keydict, commanddict, argstr)
+                txt = "call kittie_couple_start({0})".format(argstr)
+                between = '{0}{1}{2}'.format(between[:start], txt, between[stop:])
+            else:
+                between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+
+        return between, commanddict, start
+
+
+    def ReplaceClose(self, between, commanddict, keydict):
+        start, stop = self.ParseCommand(self.CloseCommand, between)
+        print(start, stop, self.CloseCommand)
+        if start is not None:
+            commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'ierr'])
+            print(self.AddStep)
+            if self.AddStep:
+                between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.CloseCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step")
+            else:
+                between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+
         return between, commanddict, start
 
 
@@ -328,9 +364,12 @@ class KittieParser(object):
     def ReplaceBeginStep(self, between, commanddict, keydict):
         start, stop = self.ParseCommand(self.BeginStepCommand, between)
         if start is not None:
-            commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'read_mode', 'ierr'])
+            try:
+                commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'step_mode', 'timeout', 'status', 'ierr'])
+            except:
+                commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'step_mode', 'ierr'])
             if self.filetype == self.knowntypes['fortran']:
-                argstr = "common_helper, {0}, {1}, {2}, {3}".format(commanddict['filename'], keydict['group'], commanddict['mode'], commanddict['comm'])
+                argstr = "common_helper, {0}, {1}, {2}, {3}".format(commanddict['filename'], keydict['group'], commanddict['open_mode'], commanddict['comm'])
                 for name in ["step", "ierr", "dir", "timefile"]:
                     argstr = self.OptionAdd(name, keydict, commanddict, argstr)
                 txt = "call kittie_couple_start({0})".format(argstr)
@@ -350,9 +389,14 @@ class KittieParser(object):
     def ReplaceGet(self, between, commanddict, keydict):
         start, stop = self.ParseCommand(self.GetCommand, between)
         if start is not None:
-            commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'varid', 'data', 'mode', 'ierr'])
+            try:
+                commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'varid', 'data', 'get_mode', 'ierr'])
+            except:
+                commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'varid', 'data', 'ierr'])
+                commanddict['get_mode'] = "adios2_mode_deferred"
+
             if self.filetype == self.knowntypes['fortran']:
-                txt = "call @{4}(common_helper%engine, {0}, {1}, {2}, {3})".format(commanddict['varid'], commanddict['data'], commanddict['mode'], commanddict['ierr'], self.GetCommand)
+                txt = "call @{4}(common_helper%engine, {0}, {1}, {2}, {3})".format(commanddict['varid'], commanddict['data'], commanddict['get_mode'], commanddict['ierr'], self.GetCommand)
             between = '{0}{1}{2}'.format(between[:start], txt, between[stop:])
         return between, commanddict, start
 
@@ -384,6 +428,7 @@ class KittieParser(object):
 
         keydict = None
         for i in range(len(matches)):
+            self.AddStep = False
             matchtext = matches[i].group(2)
             if matchtext.strip() == "":
                 keydict = None
@@ -400,6 +445,7 @@ class KittieParser(object):
             between, commanddict = self.Replacer(self.ReplaceBeginStep, between, commanddict, keydict)
             between, commanddict = self.Replacer(self.ReplaceInquire, between, commanddict, keydict)
             between, commanddict = self.Replacer(self.ReplaceEndStep, between, commanddict, keydict)
+            between, commanddict = self.Replacer(self.ReplaceClose, between, commanddict, keydict)
             between, commanddict = self.Replacer(self.ReplaceGet, between, commanddict, keydict)
             between, commanddict = self.Replacer(self.ReplacePut, between, commanddict, keydict)
             between = "\n{0}call kittie_get_helper({1}, common_helper){2}".format(indentation, keydict['group'], between)
