@@ -257,8 +257,12 @@ class KittieJob(cheetah.Campaign):
 
         # Do the user's requested links and copies
         for name in copydict[self.keywords['link']]:
-            newpath = os.path.join(outdir, os.path.basename(name))
-            os.symlink(name, newpath)
+            if type(name) == list:
+                newpath = os.path.join(outdir, name[1])
+                os.symlink(name[0], newpath)
+            else:
+                newpath = os.path.join(outdir, os.path.basename(name))
+                os.symlink(name, newpath)
 
         for name in copydict[self.keywords['copycontents']]:
             if os.path.isdir(name):

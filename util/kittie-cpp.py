@@ -261,7 +261,6 @@ class KittieParser(object):
 
     def GetAdiosArgs(self, text, commanddict, names):
         alist = self.GetArgList(text)
-        print("alist", alist)
         for i, name in enumerate(names):
             commanddict[name] = alist[i]
         return commanddict
@@ -313,10 +312,8 @@ class KittieParser(object):
 
     def ReplaceClose(self, between, commanddict, keydict):
         start, stop = self.ParseCommand(self.CloseCommand, between)
-        print(start, stop, self.CloseCommand)
         if start is not None:
             commanddict = self.GetAdiosArgs(between[start:stop], commanddict, ['engine', 'ierr'])
-            print(self.AddStep)
             if self.AddStep:
                 between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.CloseCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step")
             else:
