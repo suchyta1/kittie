@@ -186,13 +186,23 @@ class KittieParser(object):
         return matches
 
 
-    def FindKeyVals(self, text, keydict=None):
+    def FindKeyVals(self, text, keydict=None, skip=[]):
         if keydict is None:
             keydict = copy.copy(self.keydict)
         kvs = text.split(",")
         for kv in kvs:
             k = kv.strip()
             key, value = k.split("=")
+            key = key.strip()
+            value = value.strip()
+
+            if (key == "group"):
+                v = value
+                if (v[0] == '"') or (v[0] == "'"):
+                    v = v[1:-1]
+                if v in skip:
+                    keydict = None
+                    return keydict
             if (key == "step") and (value == "None"):
                 self.AddStep = True
                 continue
@@ -416,7 +426,7 @@ class KittieParser(object):
         return between, commanddict
 
 
-    def FileReplacements(self):
+    def FileReplacements(self, skip):
         with open(self.filename, 'r') as infile:
             text = infile.read()
         matches = self.FindMarkups(text)
@@ -431,7 +441,10 @@ class KittieParser(object):
                 keydict = None
                 continue
 
-            keydict = self.FindKeyVals(matchtext, keydict=keydict)
+            keydict = self.FindKeyVals(matchtext, keydict=keydict, skip=skip)
+            if keydict is None:
+                continue
+
             between, bstart, bend = self.FindCode(matches, i, text)
             indentation = self.GetIndentation(between)
 
@@ -455,7 +468,7 @@ class KittieParser(object):
             out.write(newtext)
 
 
-    def FindGroups(self, groups):
+    def FindGroups(self, groups, skip):
         with open(self.filename, 'r') as infile:
             text = infile.read()
         matches = self.FindMarkups(text)
@@ -469,8 +482,8 @@ class KittieParser(object):
                 keydict = None
                 continue
 
-            keydict = self.FindKeyVals(matchtext, keydict=keydict)
-            if keydict['group'] not in groups:
+            keydict = self.FindKeyVals(matchtext, keydict=keydict, skip=skip)
+            if (keydict is not None) and (keydict['group'] not in groups):
                 groups.append(keydict['group'])
         return groups
 
@@ -500,6 +513,7 @@ if __name__ == "__main__":
     RepoParser.add_argument("outdir", help="Output groups namelist file")
     RepoParser.add_argument("-s", "--suffix", help="String to append to file names when replaced", type=str, default="-kittie")
     RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
+    RepoParser.add_argument("-k", "--skip", help="Groups to skip", type=str, default="")
     RepoParser.set_defaults(which='repo')
 
     FileParser = subparsers.add_parser("file", help="Process one source file and replace KITTIE markups with appropriate APIs")
@@ -508,10 +522,14 @@ if __name__ == "__main__":
     FileParser.set_defaults(which='file')
 
     args = parser.parse_args()
+    if len(args.skip.strip()) == 0:
+        args.skip = []
+    else:
+        args.skip = args.skip.split(',')
 
     if args.which == "file":
         fparser = KittieParser(args.srcfile, args.outfile)
-        fparser.FileReplacements()
+        fparser.FileReplacements(args.skip)
 
     elif args.which == "repo":
         thisfile = os.path.realpath(__file__)
@@ -525,8 +543,8 @@ if __name__ == "__main__":
 
             if filename.endswith('.F90'):
                 fparser = KittieParser(filename, outfile)
-                groups = fparser.FindGroups(groups)
-                fparser.FileReplacements()
+                groups = fparser.FindGroups(groups, args.skip)
+                fparser.FileReplacements(args.skip)
 
         if args.name is None:
             args.name = os.path.basename(args.directory)
