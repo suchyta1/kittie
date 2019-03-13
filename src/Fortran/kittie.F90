@@ -468,12 +468,15 @@ module kittie
 		subroutine kittie_finalize(ierr)
 			integer, intent(out) :: ierr
 			integer :: i, rank
-			call adios2_finalize(kittie_adios, ierr)
 			do i=1, size(helpers)
+				print *, "closing: ", groupnames(i)
+				call kittie_close(helpers(i), ierr)
+				print *, "done closing: ", groupnames(i)
 				if ((helpers(i)%rank == 0) .and. (helpers(i)%mode == adios2_mode_write)) then
 					call touch_file(trim(helpers(i)%filename)//'.done')
 				end if
 			end do
+			call adios2_finalize(kittie_adios, ierr)
 		end subroutine kittie_finalize
 
 
