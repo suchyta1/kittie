@@ -103,7 +103,8 @@ class KittieParser(object):
         exp1 = "\s*"
         exp1 = "[ \t\r\f\v]*"
         search1 = re.compile(exp1)
-        exp2 = "\\\\\n"
+        #exp2 = "\\\\\n"
+        exp2 = "&\n"
         search2 = re.compile(exp2)
 
         while True:
@@ -159,15 +160,33 @@ class KittieParser(object):
                 if result is None:
                     raise ValueError("Error in {0} function open".format(command))
 
-                expr = "^\(.*\)"
+                expr = "^\(.*(?<!/)\)"
                 search = re.compile(expr)
-                result = search.match(newstr.replace("\\\n", ""))
-                if result is None:
-                    raise ValueError("Error in {0} function close".format(command))
-                expr = "\\\\\n"
+                #result = search.match(newstr.replace("\\\n", ""))
+
+                num = 0
+                while True:
+                    result = search.match(newstr)
+
+                    if result is None:
+                        nstr = newstr.replace("&\n", "", 1)
+                        if nstr == newstr:
+                            raise ValueError("Error in {0} function close".format(command))
+                        else:
+                            num += 1
+                            newstr = nstr
+                    else:
+                        break
+
+
+                #expr = "\\\\\n"
+                """
+                expr = "&\n"
                 search = re.compile(expr)
                 nresult = search.findall(newstr)
                 num = len(nresult)
+                """
+
                 shift += result.end() + num * 2
                 end_index = open_index + shift
                 found = True
