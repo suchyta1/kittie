@@ -584,6 +584,42 @@ module kittie
 		end function KittieDeclareIO
 
 
+		function KittieDefineVariable(groupname, varname, dtype, ndims, global_dims, global_offsets, local_dims, ierr, constant_dims) result(varid)
+			! At least for now, it makes sense to basically use the ADIOS-2 API
+
+			character(len=*), intent(in) :: groupname
+			character(len=*), intent(in) :: varname
+			integer, intent(in)  :: dtype
+			integer, intent(in)  :: ndims
+			integer(kind=8), dimension(:), intent(in), optional :: global_dims
+			integer(kind=8), dimension(:), intent(in), optional :: global_offsets
+			integer(kind=8), dimension(:), intent(in), optional :: local_dims
+			integer, intent(out), optional :: ierr
+			logical, intent(in), optional :: constant_dims
+
+			integer :: err
+			type(adios2_variable) :: varid
+			type(adios2_io)       :: io
+
+			call adios2_at_io(io, kittie_adios, trim(groupname), err)
+
+			if (present(global_dims)) then
+				if (present(constant_dims)) then
+					call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, constant_dims, err)
+				else
+					call adios2_define_variable(varid, io, varname, dtype, ndims, global_dims, global_offsets, local_dims, adios2_constant_dims, err)
+				end if
+			else
+				call adios2_define_variable(varid, io, varname, dtype, err)
+			end if
+
+			if (present(ierr)) then
+				ierr = err
+			end if
+
+		end function KittieDefineVariable
+
+
 		subroutine kittie_define_variable(groupname, varname, dtype, ndims, global_dims, global_offsets, local_dims, ierr, constant_dims)
 			! At least for now, it makes sense to basically use the ADIOS-2 API
 

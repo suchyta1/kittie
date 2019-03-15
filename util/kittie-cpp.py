@@ -367,7 +367,8 @@ class KittieParser(object):
                 commanddict['io'] = "common_helper%io"
                 commanddict = self.CommandKeyAdd(['ierr'], keydict, commanddict)
 
-                txt = "call kittie_define_variable("
+                #txt = "call kittie_define_variable("
+                txt = "{0} = KittieDefineVariable(".format(commanddict['varid'])
                 for key in knames:
                     txt = "{0}{1}, ".format(txt, commanddict[key])
                 txt = "{0})".format(txt.rstrip(', '))
