@@ -577,7 +577,7 @@ module kittie
 				end if
 
 				do j=1, nparams(i)
-					call adios2_set_parameter(io, params(i, j), values(i, j), ierr)
+					call adios2_set_parameter(io, trim(params(i, j)), trim(values(i, j)), ierr)
 				end do
 
 			end do
