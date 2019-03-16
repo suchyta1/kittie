@@ -15,7 +15,7 @@ module kittie_internal
 		logical :: use_mpi=.false.
 #	endif
 
-	logical :: touch = .true.
+	logical :: touch = .false.
 	integer :: iounit=2018
 
 	! This is the namespace all the Kittie ADIOS-2 I/O lives in. Nicely, this will be completely independent of anything else ADIOS-2.
