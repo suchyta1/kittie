@@ -1,7 +1,12 @@
 include_directories(${ADIOS2_INCLUDE_DIRS})
 add_definitions(-ffree-line-length-none)
+
 if(USE_MPI)
 	add_definitions(-DUSE_MPI)
+endif()
+
+if(FINE_TIME)
+	add_definitions(-DFINE_TIME)
 endif()
 
 set(module_objects ${CMAKE_CURRENT_SOURCE_DIR}/kittie.F90 ${CMAKE_CURRENT_SOURCE_DIR}/kittie_internal.F90)
