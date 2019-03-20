@@ -391,11 +391,15 @@ class KittieJob(cheetah.Campaign):
 
     def WritePlotsFile(self):
         if len(self.plots.keys()) > 0:
-            if self.launchmode == "MPMD":
-                outname = os.path.join(self.mainpath, 'kittie-plots.yaml')
-            else:
-                outname = os.path.join(self.mainpath, 'kittie-plotter', 'kittie-plots.yaml')
+            rc = os.path.join(os.path.dirname(self.codesetup['kittie-plotter']['path']), 'matplotlibrc')
 
+            if self.launchmode == "MPMD":
+                outdir = self.mainpath
+            else:
+                outdir = os.path.join(self.mainpath, 'kittie-plotter')
+
+            outname = os.path.join(outdir, 'kittie-plots.yaml')
+            shutil.copy(rc, os.path.join(outdir, 'matplotlibrc'))
             outstr = yaml.dump(self.plots, default_flow_style=False, Dumper=self.OrderedDumper)
             with open(outname, 'w') as out:
                 out.write(outstr)
