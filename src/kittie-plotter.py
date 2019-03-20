@@ -59,7 +59,7 @@ class PlotHelper(object):
 
         matplotlib.rcParams['axes.unicode_minus'] = False
         gs = gridspec.GridSpec(1, 1)
-        fig = plt.figure(figsize=(6,6))
+        fig = plt.figure(figsize=(7,6))
         ax = fig.add_subplot(gs[0, 0])
         ax.plot(data['x'], data['y'])
         ax.set_title(self.name, fontsize=fs)
