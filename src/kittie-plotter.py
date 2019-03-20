@@ -63,9 +63,9 @@ class PlotHelper(object):
         ax = fig.add_subplot(gs[0, 0])
         ax.plot(data['x'], data['y'])
         ax.set_title(self.name, fontsize=fs)
-        ax.set_ylabel(self.y, fontsize=fs)
+        ax.set_ylabel(self.y.replace('_', '-'), fontsize=fs)
         if self.x is not None:
-            ax.set_xlabel(self.x, fontsize=fs)
+            ax.set_xlabel(self.x.replace('_', '-'), fontsize=fs)
         else:
             ax.set_xlabel('index')
 
