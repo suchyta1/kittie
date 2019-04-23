@@ -5,7 +5,7 @@ The dependencies for `Kittie` itself are much lighter than the dependencies for 
 so I'll just keep saying `Kittie` for now in the documentation.)
 
 * [ADIOS-2](https://github.com/ornladios/ADIOS2)
-* [Cheetah](https://github.com/suchyta1/cheetah/tree/suchyta) -- notice the 'nonstandard' `suchyta` version, which has not been merged into master. (This is what provides the YAML frontend.)
+* [Cheetah](https://github.com/suchyta1/cheetah/tree/summit-support) -- notice the 'nonstandard' `summit-support` version, which has not been merged into master. (This is what provides the YAML frontend.)
 
 `Kittie` itself is a CMake package. 
 I've never quite been able to figure out how to get the Python installation to work correctly under CMake, 
