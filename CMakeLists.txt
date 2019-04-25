@@ -18,6 +18,7 @@ set_property(CACHE PYTHON_PREFIX PROPERTY STRINGS "ON;TRUE;OFF;FALSE")
 
 # Find ADIOS-2
 find_package(ADIOS2 REQUIRED)
+find_package(YAMLCPP REQUIRED)
 
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
 	find_package(PythonInterp REQUIRED)

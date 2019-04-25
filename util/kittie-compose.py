@@ -112,23 +112,30 @@ class KittieJob(cheetah.Campaign):
         # Some things that'll be given to Cheetah
         self.cheetahdir = '.cheetah'
         self.groupname = "kittie-run"
-        self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-{0:03d}'.format(0))
+        #self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-{0:03d}'.format(0))
+        self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-0.0'.format(0))
 
 
         # Do something (possible warn or exit) if certain things aren't found
-        self._SetIfNotFound(self.config, 'rundir', 'kittie-run')
-        self._SetIfNotFound(self.config, 'jobname', 'kittie-job')
-        self._SetIfNotFound(self.config, 'walltime', 1800, level=logging.WARNING)
-        self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
-
         self._SetIfNotFound(self.config, 'machine', level=logging.ERROR)
         self._SetIfNotFound(self.config['machine'], 'name', level=logging.ERROR)
+        if self.config['machine']['name'] != 'local':
+            self._SetIfNotFound(self.config, 'walltime', 1800, level=logging.WARNING)
+        else:
+            self._SetIfNotFound(self.config, 'walltime', 1800, level=logging.INFO)
+
+        self._SetIfNotFound(self.config, 'rundir',  'kittie-run', level=logging.WARNING)
+        self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
+
+        self._SetIfNotFound(self.config, 'jobname', 'kittie-job', level=logging.INFO)
+        self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
+
         self._SetIfNotFound(self.config['machine'], 'job_setup', value=None, level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'submit_setup', value=None, level=logging.INFO)
-        self._SetIfNotFound(self.config['machine'], 'runner_extra', value="", level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'script', value=None, level=logging.INFO)
 
-        self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
+        self._SetIfNotFound(self.config['machine'], 'runner_extra', value="", level=logging.INFO)
+        self._SetIfNotFound(self.config['machine'], 'scheduler_args', value=None, level=logging.INFO)
 
 
         # Allow certain sets of keywords generally in different parts of the config file, and initialize then to be empty
@@ -144,6 +151,7 @@ class KittieJob(cheetah.Campaign):
         for codename in self.codenames:
             self._BlankInit(self.codescope_dict, self.codesetup[codename], {})
             self._BlankInit(self.codescope_list, self.codesetup[codename], [])
+            self._SetIfNotFound(self.codesetup[codename], 'scheduler_args', value=None, level=logging.INFO)
 
 
     def _Unmatched(self, match):
@@ -385,9 +393,10 @@ class KittieJob(cheetah.Campaign):
                         self.plots[title] = {}
                         self.plots[title]['filename'] = entry['filename']
                         self.plots[title]['engine'] = entry['engine']
-                        self.plots[title]['y'] = entry['plot'][title]['y']
-                        if 'x' in entry['plot'][title]:
-                            self.plots[title]['x'] = entry['plot'][title]['x']
+
+                        for key in ['x', 'y', 'image']:
+                            if key in entry['plot'][title]:
+                                self.plots[title][key] = entry['plot'][title][key]
 
     def WritePlotsFile(self):
         if len(self.plots.keys()) > 0:
@@ -491,6 +500,8 @@ class KittieJob(cheetah.Campaign):
             self.launchmode = 'default'
             subdirs = False
 
+
+
         self.GetPlots()
         if len(self.plots.keys()) > 0:
             self.codesetup['kittie-plotter'] = {}
@@ -499,9 +510,10 @@ class KittieJob(cheetah.Campaign):
             self.codesetup['kittie-plotter']['processes-per-node'] = 1
             self._BlankInit(self.codescope_dict, self.codesetup['kittie-plotter'], {})
             self._BlankInit(self.codescope_list, self.codesetup['kittie-plotter'], [])
+            self._SetIfNotFound(self.codesetup['kittie-plotter'], 'scheduler_args', value=None, level=logging.INFO)
 
 
-        for codename in self.codenames:
+        for k, codename in enumerate(self.codenames):
 
             codedict = {}
             codedict['exe'] = self.codesetup[codename]['path']
@@ -513,9 +525,9 @@ class KittieJob(cheetah.Campaign):
                     if 'appname' not in self.codesetup[codename]:
                         raise ValueError("{0} {1}/.kittie-setup file does not exist".format(codename, codedict['exe']))
                 else:
-                    self.codesetup[codename]['appname'] = self.GetAppName(self.codesetup[codename]['setup-file'])
+                    self.codesetup[codename]['appname'] = "{0}-{1}".format(self.GetAppName(self.codesetup[codename]['setup-file']), k)
             else:
-                self.codesetup[codename]['appname'] = "kittie-plotter"
+                self.codesetup[codename]['appname'] = "kittie-plotter-{0}".format(k)
 
 
             # Set the number of processes
@@ -526,13 +538,26 @@ class KittieJob(cheetah.Campaign):
             # Set the command line arguments
             args = self.codesetup[codename]['args']
             for i, arg in enumerate(args):
-                sweeparg = cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i), i, [arg])
+                sweeparg = cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])
                 sweepargs.append(sweeparg)
 
             options = self.codesetup[codename]['options']
             for i, option in enumerate(options):
                 sweepopt = cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option[0]), [option[1]])
                 sweepargs.append(sweepopt)
+
+            if self.config['machine'][self.keywords['scheduler_args']] is not None:
+                schedarg = cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.config['machine'][self.keywords['scheduler_args']])])
+                sweepargs.append(schedarg)
+            if self.codesetup[codename][self.keywords['scheduler_args']] is not None:
+                schedarg = cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.codesetup[codename][self.keywords['scheduler_args']])])
+                sweepargs.append(schedarg)
+
+            exedir = os.path.dirname(self.codesetup[codename]['path'])
+            sweepenv1 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-yaml', 'KITTIE_YAML_FILE', [os.path.join(exedir, ".kittie-setup.yaml")])
+            sweepenv2 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-nml',  'KITTIE_NML_FILE',  [os.path.join(exedir, ".kittie-setup.nml" )])
+            sweepenv3 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-num',  'KITTIE_NUM', ['{0}'.format(k)])
+            sweepargs += [sweepenv1, sweepenv2, sweepenv3]
 
         # A sweep encompasses is a set of parameters that can vary. In my case nothing is varying, and the only sweep paramter is a single number of processes
         sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
@@ -675,6 +700,16 @@ class KittieJob(cheetah.Campaign):
             outstr = kittie_common.Namelist(names, names_list, plots_list, params_list)
             kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
 
+            if self.launchmode == "default":
+                outdir = os.path.join(self.mainpath, codename)
+            else:
+                outdir = self.mainpath
+            #outstr = yaml.dump(dict(self.codesetup[codename]["groups"]), default_flow_style=False)
+            outstr = yaml.dump(self.codesetup[codename]["groups"], default_flow_style=False, Dumper=self.OrderedDumper)
+            outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(self.codesetup[codename]['appname']))
+            with open(outname, "w") as outfile:
+                outfile.write(outstr)
+
 
     def WriteCodesFile(self):
         gstrs = []
@@ -691,21 +726,15 @@ class KittieJob(cheetah.Campaign):
             outstr = kittie_common.Namelist(nlist, glist)
             kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
 
-
-    def WriteOutYAML(self):
-        outdict = {}
-        for i, codename in enumerate(self.codenames):
-            if len(self.codesetup[codename]['groups']) > 0:
-                outdict = self.codesetup[codename]['groups']
-                outstr = yaml.dump(outdict, default_flow_style=False)
-
-                if self.launchmode == "default":
-                    outdir = os.path.join(self.mainpath, codename)
-                else:
-                    outdir = self.mainpath
-
-                with open(os.path.join(outdir, ".kittie-setup-{0}.yaml".format(self.codesetup[codename]['appname'])), 'w') as outfile:
-                    outfile.write(outstr)
+            if self.launchmode == "default":
+                outdir = os.path.join(self.mainpath, codename)
+            else:
+                outdir = self.mainpath
+            outdict = {'n': len(self.codenames), 'codename': codename, 'codes': list(self.codenames)}
+            outstr = yaml.dump(outdict, default_flow_style=False)
+            outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(self.codesetup[codename]['appname']))
+            with open(outname, 'w') as outfile:
+                outfile.write(outstr)
 
 
     def FromScript(self):
@@ -721,9 +750,12 @@ class KittieJob(cheetah.Campaign):
         self.init(yamlfile)
         super(KittieJob, self).__init__(self.machine, "")
 
+        """
         if self.config['machine']['runner_extra'] is None:
             self.config['machine']['runner_extra'] = ""
         self.make_experiment_run_dir(self.output_dir, runner_extra=self.config['machine']['runner_extra'])
+        """
+        self.make_experiment_run_dir(self.output_dir)
 
         if self.config['machine'][self.keywords['script']] is not None:
             self.launchmode = 'MPMD'
@@ -735,10 +767,8 @@ class KittieJob(cheetah.Campaign):
         self.WriteCodesFile()
         self.WriteGroupsFile()
         self.WritePlotsFile()
-        self.WriteOutYAML()
 
         self.FromScript()
-
         self.MoveLog()
 
 

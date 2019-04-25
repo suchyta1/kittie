@@ -169,6 +169,7 @@ class Coupler(object):
             self.engine.Close()
 
             self.io.RemoveAllVariables()
+            self.io.RemoveAllAttributes()
             """
             self.groupname = "{0}+".format(self.groupname)
             Group(self.groupname)
@@ -292,6 +293,7 @@ class Coupler(object):
                 self.engine.Close()
 
                 self.io.RemoveAllVariables()
+                self.io.RemoveAllAttributes()
                 """
                 self.groupname = "{0}+".format(self.groupname)
                 Group(self.groupname)
