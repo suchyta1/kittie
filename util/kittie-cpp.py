@@ -12,10 +12,11 @@ import yaml
 import kittie_common
 
 
-def GetArgList(text, elen=1):
+def GetArgList(text):
     bss = text.strip()
     argstart = bss.find('(') + 1
-    astr = bss[argstart:-elen]
+    argend = bss.rfind(')')
+    astr = bss[argstart:argend]
 
     alist = []
     opened = 0
@@ -33,8 +34,8 @@ def GetArgList(text, elen=1):
     return alist
 
 
-def GetAdiosArgs(text, commanddict, names, elen=1):
-    alist = GetArgList(text, elen=elen)
+def GetAdiosArgs(text, commanddict, names):
+    alist = GetArgList(text)
     for i, name in enumerate(names):
         commanddict[name] = alist[i]
     return commanddict
@@ -159,7 +160,7 @@ class BaseReplacer(object):
             return start
 
 
-    def FindEqual(self, text, start, kittie_command, commanddict, newargs, result=None, elen=1, obj=False, pre=""):
+    def FindEqual(self, text, start, kittie_command, commanddict, newargs, result=None, obj=False, pre=""):
         start = self.EqualStart(text, start, cond=obj)
 
         if result is not None:
@@ -173,13 +174,16 @@ class BaseReplacer(object):
         return txt
 
 
-    def CommonNoOptions(self, commanddict, keydict, command, text, args, newargs, kittie_command, result=None, elen=1, obj=False, pre=""):
+    def CommonNoOptions(self, commanddict, keydict, command, text, args, newargs, kittie_command, result=None, obj=False, pre="", single=False):
         start, stop = self.ParseCommand(command, text)
         if start is not None:
-            commanddict = GetAdiosArgs(text[start:stop], commanddict, args, elen=elen)
+            commanddict = GetAdiosArgs(text[start:stop], commanddict, args)
             commanddict = CommandKeyAdd(newargs, keydict, commanddict)
-            txt = self.FindEqual(text, start, kittie_command, commanddict, newargs, result=result, elen=elen, obj=obj, pre=pre)
-            text = '{0}{1}{2}'.format(text[:start], txt, text[stop:])
+            txt = self.FindEqual(text, start, kittie_command, commanddict, newargs, result=result, obj=obj, pre=pre)
+            if not single:
+                text = '{0}{1}{2}'.format(text[:start], txt, text[stop:])
+            else:
+                text = '{0}{1}'.format(text[:start], txt)
         return text, commanddict, start
 
 
@@ -240,7 +244,7 @@ class CppReplacer(BaseReplacer):
         return argstr
 
 
-    def ReplaceDeclareIO(self, between, commanddict, keydict):
+    def ReplaceDeclareIO(self, between, commanddict, keydict, single=False):
         if keydict['io'] is not None:
             commanddict['io'] = keydict['io']
         command = "{0}".format(self.DeclareCommand)
@@ -248,20 +252,24 @@ class CppReplacer(BaseReplacer):
 
         start, stop = self.ParseCommand(command, between)
         if start is not None:
-            commanddict = GetAdiosArgs(between[start:stop], commanddict, ['group'], elen=2)
+            commanddict = GetAdiosArgs(between[start:stop], commanddict, ['group'])
             commanddict = CommandKeyAdd(['group'], keydict, commanddict)
             argstr = "kittie::declare_io({0});".format(keydict['group'])
             start = self.EqualStart(between, start)
-            between = '{0} {1}{2}'.format(between[:start], argstr, between[stop:])
+
+            if not single:
+                between = '{0} {1}{2}'.format(between[:start], argstr, between[stop:])
+            else:
+                between = '{0} {1}'.format(between[:start], argstr)
 
             if keydict['io'] is None:
                 io = GetVar(between, start)
                 commanddict['io'] = io
 
-        return between, commanddict, start
+        return between, commanddict, start, stop
 
 
-    def ReplaceOpen(self, between, commanddict, keydict, indentation=""):
+    def ReplaceOpen(self, between, commanddict, keydict, indentation="", single=False):
         if keydict['engine'] is not None:
             commanddict['engine'] = keydict['engine']
         command = "{1}.{0}".format(self.OpenCommand, commanddict['io'])
@@ -269,9 +277,9 @@ class CppReplacer(BaseReplacer):
         start, stop = self.ParseCommand(command, between)
         if start is not None:
             try:
-                commanddict = GetAdiosArgs(between[start:stop], commanddict, ['filename', 'open_mode', 'comm'], elen=2)
+                commanddict = GetAdiosArgs(between[start:stop], commanddict, ['filename', 'open_mode', 'comm'])
             except:
-                commanddict = GetAdiosArgs(between[start:stop], commanddict, ['filename', 'open_mode'], elen=2)
+                commanddict = GetAdiosArgs(between[start:stop], commanddict, ['filename', 'open_mode'])
 
 
             #argstr = "kittie::Couplers[{0}]->open({1}, {2}".format(keydict['group'], commanddict['filename'], commanddict['open_mode'])
@@ -281,16 +289,6 @@ class CppReplacer(BaseReplacer):
             argstr = "{0});".format(argstr)
             start = self.EqualStart(between, start)
 
-            """
-            ws = [' ', '\n', '\t', '\r', '\f', '\v']
-            wordend = start - 1
-            while between[wordend-1] in ws:
-                wordend -= 1
-            wordstart = wordend - 1
-            while between[wordstart-1] not in (ws + [';', '{', '}']):
-                wordstart -= 1
-            engine = between[wordstart:wordend]
-            """
 
             if keydict['engine'] is None:
                 engine = GetVar(between, start)
@@ -309,23 +307,28 @@ class CppReplacer(BaseReplacer):
                 argstr = '{0}\n{1}'.format(argstr, astr)
 
 
-            between = '{0} {1}{2}'.format(between[:start], argstr, between[stop:])
-        return between, commanddict, start
+            if not single:
+                between = '{0} {1}{2}'.format(between[:start], argstr, between[stop:])
+            else:
+                between = '{0} {1}'.format(between[:start], argstr)
+
+        return between, commanddict, start, stop
 
 
-    def ReplaceBeginStep(self, between, commanddict, keydict, indentation=""):
+    def ReplaceBeginStep(self, between, commanddict, keydict, indentation="", single=False):
         if 'engine' in commanddict:
             command = "{1}.{0}".format(self.BeginStepCommand, commanddict['engine'])
             start, stop = self.ParseCommand(command, between)
         else:
             start = None
+            stop = None
 
         if start is not None:
             num = 2
             args = ['step_mode', 'timeout']
             while num > 0:
                 try:
-                    commanddict = GetAdiosArgs(between[start:stop], commanddict, args[0:num], elen=2)
+                    commanddict = GetAdiosArgs(between[start:stop], commanddict, args[0:num])
                     break
                 except:
                     num -= 1
@@ -347,31 +350,40 @@ class CppReplacer(BaseReplacer):
 
             estr = "{0} = kittie::Couplers[{1}]->engine;".format(commanddict['engine'], keydict['group'])
             txt = "{0}); {1}".format(argstr, estr)
-            between = '{0}{1}{2}'.format(between[:start], txt, between[stop:])
 
-        return between, commanddict, start
+            if not single:
+                between = '{0}{1}{2}'.format(between[:start], txt, between[stop:])
+            else:
+                between = '{0}{1}'.format(between[:start], txt)
+
+        return between, commanddict, start, stop
 
 
-    def ReplaceEndStep(self, between, commanddict, keydict):
+    def ReplaceEndStep(self, between, commanddict, keydict, single=False):
         if 'engine' in commanddict:
             command = "{1}.{0}".format(self.EndStepCommand, commanddict['engine'])
             start, stop = self.ParseCommand(command, between)
         else:
             start = None
+            stop = None
 
         if start is not None:
-            commanddict = GetAdiosArgs(between[start:stop], commanddict, [], elen=2)
+            commanddict = GetAdiosArgs(between[start:stop], commanddict, [])
             argstr = "kittie::Couplers[{0}]->end_step();".format(keydict['group'])
-            between = '{0}{1}{2}'.format(between[:start], argstr, between[stop:])
-        return between, commanddict, start
+            if not single:
+                between = '{0}{1}{2}'.format(between[:start], argstr, between[stop:])
+            else:
+                between = '{0}{1}'.format(between[:start], argstr)
+        return between, commanddict, start, stop
 
 
-    def ReplaceClose(self, between, commanddict, keydict):
+    def ReplaceClose(self, between, commanddict, keydict, single=False):
         if 'engine' in commanddict:
             command = "{1}.{0}".format(self.CloseCommand, commanddict['engine'])
             start, stop = self.ParseCommand(command, between)
         else:
             start = None
+            stop = None
 
         if start is not None:
             commanddict = GetAdiosArgs(between[start:stop], commanddict, [])
@@ -379,8 +391,11 @@ class CppReplacer(BaseReplacer):
             if self.AddStep:
                 argstr = "kittie::Couplers[{0}]->end_step();\n".format(keydict['group'])
             argstr = "{0}kittie::Couplers[{1}]->close();".format(argstr, keydict['group'])
-            between = '{0}{1}{2}'.format(between[:start], argstr, between[stop:])
-        return between, commanddict, start
+            if not single:
+                between = '{0}{1}{2}'.format(between[:start], argstr, between[stop:])
+            else:
+                between = '{0}{1}'.format(between[:start], argstr)
+        return between, commanddict, start, stop
 
 
 
@@ -492,7 +507,7 @@ class FortranReplacer(BaseReplacer):
 
 
 
-    def ReplaceOpen(self, between, commanddict, keydict, indentation=""):
+    def ReplaceOpen(self, between, commanddict, keydict, indentation="", single=False):
         start, stop = self.ParseCommand(self.OpenCommand, between)
         if start is not None:
             commanddict = GetAdiosArgs(between[start:stop], commanddict, ['engine', 'io', 'filename', 'open_mode', 'comm', 'ierr'])
@@ -508,38 +523,47 @@ class FortranReplacer(BaseReplacer):
                 engine = "{0} = common_helper%engine".format(commanddict['engine'])
                 space = "\n"
 
-                between = '{0}{1}{3}{4}{2}'.format(between[:start], txt, between[stop:], space, engine)
+                if not single:
+                    between = '{0}{1}{3}{4}{2}'.format(between[:start], txt, between[stop:], space, engine)
+                else:
+                    between = '{0}{1}{3}{4}'.format(between[:start], txt, between[stop:], space, engine)
 
             else:
-                between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+                if not single:
+                    between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+                else:
+                    between = '{0}{1}'.format(between[:start], "")
 
-        return between, commanddict, start
+        return between, commanddict, start, stop
 
 
-    def ReplaceClose(self, between, commanddict, keydict):
+    def ReplaceClose(self, between, commanddict, keydict, single=False):
         start, stop = self.ParseCommand(self.CloseCommand, between)
         if start is not None:
             commanddict = GetAdiosArgs(between[start:stop], commanddict, ['engine', 'ierr'])
             if self.AddStep:
-                between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.CloseCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step", pre="call ")
+                between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.CloseCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step", pre="call ", single=single)
             else:
-                between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+                if not single:
+                    between = '{0}{1}{2}'.format(between[:start], "", between[stop:])
+                else:
+                    between = '{0}{1}'.format(between[:start], "")
 
-        return between, commanddict, start
+        return between, commanddict, start, stop
 
 
-    def ReplaceDeclareIO(self, between, commanddict, keydict):
+    def ReplaceDeclareIO(self, between, commanddict, keydict, single=False):
         #between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "kittie_declare_io")
-        between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "KittieDeclareIO", result='io')
-        return between, commanddict, start
+        between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.DeclareCommand, between, ['io', 'adios', 'group', 'ierr'], ['group', 'ierr'], "KittieDeclareIO", result='io', single=single)
+        return between, commanddict, start, stop
 
 
-    def ReplaceEndStep(self, between, commanddict, keydict):
-        between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.EndStepCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step", pre="call ")
-        return between, commanddict, start
+    def ReplaceEndStep(self, between, commanddict, keydict, single=False):
+        between, commanddict, start = self.CommonNoOptions(commanddict, keydict, self.EndStepCommand, between, ['engine', 'ierr'], ['helper', 'ierr'], "kittie_couple_end_step", pre="call ", single=single)
+        return between, commanddict, start, stop
 
 
-    def ReplaceBeginStep(self, between, commanddict, keydict, indentation=""):
+    def ReplaceBeginStep(self, between, commanddict, keydict, indentation="", single=False):
         start, stop = self.ParseCommand(self.BeginStepCommand, between)
 
         if start is not None:
@@ -558,7 +582,7 @@ class FortranReplacer(BaseReplacer):
 
             between = '{0}{1}{3}{4}{2}'.format(between[:start], txt, between[stop:], space, engine)
 
-        return between, commanddict, start
+        return between, commanddict, start, stop
 
 
 
@@ -610,6 +634,9 @@ class KittieParser(object):
             key = key.strip()
             value = value.strip()
 
+            if value.endswith(';'):
+                value = value[:-1]
+
             if (key == "group"):
                 v = value
                 if (v[0] == '"') or (v[0] == "'"):
@@ -655,20 +682,27 @@ class KittieParser(object):
         return indentation
 
 
-    def Replacer(self, func, between, commanddict, keydict, indentation=None):
+    def Replacer(self, func, between, commanddict, keydict, indentation=None, single=False, stop=None):
+        if stop is not None:
+            return between, commanddict, stop
+
         start = True
         while start is not None:
+            oldbetween = between
             if indentation is not None:
-                between, commanddict, start = func(between, commanddict, keydict, indentation=indentation)
+                between, commanddict, start, stop = func(between, commanddict, keydict, indentation=indentation, single=single)
             else:
-                between, commanddict, start = func(between, commanddict, keydict)
+                between, commanddict, start, stop = func(between, commanddict, keydict, single=single)
+
+            if single and (oldbetween != between):
+                break
 
         """
         for name in [self.DefineCommand, self.InquireCommand, self.GetCommand, self.PutCommand]:
             between = between.replace("@{0}".format(name), name)
         """
 
-        return between, commanddict
+        return between, commanddict, stop
 
 
 
@@ -696,25 +730,39 @@ class KittieParser(object):
             if group not in cdict.keys():
                 cdict[group] = {'helper': 'common_helper'}
 
-            between, bstart, bend = self.FindCode(matches, i, text)
-            indentation = self.GetIndentation(between)
+
+            if not matches[i].group(2).strip().endswith(';'):
+                between, bstart, bend = self.FindCode(matches, i, text)
+                indentation = self.GetIndentation(between)
+                single = False
+            else:
+                bstart = matches[i].end()
+                between = text[bstart:]
+                indentation = self.GetIndentation(between)
+                single = True
+
 
             if self.filetype == 'fortran':
                 replacer = FortranReplacer(AddStep=self.AddStep)
             elif self.filetype == 'c++':
                 replacer = CppReplacer(AddStep=self.AddStep)
 
-            between, cdict[group] = self.Replacer(replacer.ReplaceDeclareIO, between, cdict[group], keydict)
-            between, cdict[group] = self.Replacer(replacer.ReplaceOpen,      between, cdict[group], keydict)
-            between, cdict[group] = self.Replacer(replacer.ReplaceBeginStep, between, cdict[group], keydict)
-            between, cdict[group] = self.Replacer(replacer.ReplaceEndStep,   between, cdict[group], keydict)
-            between, cdict[group] = self.Replacer(replacer.ReplaceClose,     between, cdict[group], keydict)
+            end = None
+            between, cdict[group], end = self.Replacer(replacer.ReplaceDeclareIO, between, cdict[group], keydict, single=single, stop=end)
+            between, cdict[group], end = self.Replacer(replacer.ReplaceOpen,      between, cdict[group], keydict, single=single, stop=end)
+            between, cdict[group], end = self.Replacer(replacer.ReplaceBeginStep, between, cdict[group], keydict, single=single, stop=end)
+            between, cdict[group], end = self.Replacer(replacer.ReplaceEndStep,   between, cdict[group], keydict, single=single, stop=end)
+            between, cdict[group], end = self.Replacer(replacer.ReplaceClose,     between, cdict[group], keydict, single=single, stop=end)
 
             if self.filetype == 'fortran':
                 between = "\n{0}call kittie_get_helper({1}, common_helper){2}".format(indentation, group, between)
 
             newtext = "{0}{1}{2}".format(newtext, text[start:bstart], between)
-            start = bend
+
+            if single:
+                start = bstart + end
+            else:
+                start = bend
 
         newtext = "{0}{1}".format(newtext, text[start:])
         with open(self.outfilename, 'w') as out:
@@ -841,7 +889,6 @@ if __name__ == "__main__":
                     fname = filename
 
                 for ext in [".F90", ".cpp"]:
-                    print(ext, fname)
                     if not fname.endswith(ext):
                         continue
 
