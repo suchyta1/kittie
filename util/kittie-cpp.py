@@ -244,6 +244,24 @@ class CppReplacer(BaseReplacer):
         return argstr
 
 
+    def ReplaceInit(self, between, commanddict, keydict, single=False, indentation=""):
+        if not single:
+            raise ValueError("It doens't make sense to try to initialize Kittie without single line replacement")
+
+        args = []
+        if keydict["init"] is not None:
+            args += [keydict["init"]]
+        if keydict['comm'] is not None:
+            args += [keydict['comm']]
+        args += ['adios2::DebugON']
+
+        between = "\n{1}kittie::initialize({2});".format(between, indentation, ', '.join(args))
+        start = None
+        stop = 0
+
+        return between, commanddict, start, stop
+
+
     def ReplaceDeclareIO(self, between, commanddict, keydict, single=False):
         if keydict['io'] is not None:
             commanddict['io'] = keydict['io']
@@ -637,6 +655,12 @@ class KittieParser(object):
             if value.endswith(';'):
                 value = value[:-1]
 
+            if (key == "init"):
+                if value == "None":
+                    keydict["init"] = None
+                else:
+                    keydict["init"] = value
+
             if (key == "group"):
                 v = value
                 if (v[0] == '"') or (v[0] == "'"):
@@ -650,7 +674,7 @@ class KittieParser(object):
             if key in self.keywords:
                 keydict[key] = value
 
-        if keydict["group"] is None:
+        if (keydict["group"] is None) and (text.find("init") == -1):
             raise ValueError("All KITTIE markups most denote which group they're associated to")
 
         return keydict
@@ -723,6 +747,7 @@ class KittieParser(object):
                 continue
 
             keydict = self.FindKeyVals(matchtext, keydict=keydict, skip=skip)
+
             if keydict is None:
                 continue
 
@@ -748,6 +773,12 @@ class KittieParser(object):
                 replacer = CppReplacer(AddStep=self.AddStep)
 
             end = None
+            print("keydict:", keydict)
+            if "init" in keydict:
+                #between = text[matches[i].start():]
+                #between, cdict[group], end = self.Replacer(replacer.ReplaceInit, between, cdict[group], keydict, single=single, stop=end)
+                between, cdict[group], end = self.Replacer(replacer.ReplaceInit, between, cdict[group], keydict, single=single, stop=end, indentation=indentation)
+                del keydict["init"]
             between, cdict[group], end = self.Replacer(replacer.ReplaceDeclareIO, between, cdict[group], keydict, single=single, stop=end)
             between, cdict[group], end = self.Replacer(replacer.ReplaceOpen,      between, cdict[group], keydict, single=single, stop=end)
             between, cdict[group], end = self.Replacer(replacer.ReplaceBeginStep, between, cdict[group], keydict, single=single, stop=end)
@@ -784,8 +815,11 @@ class KittieParser(object):
                 continue
 
             keydict = self.FindKeyVals(matchtext, keydict=keydict, skip=skip)
+
             if (keydict is not None) and (keydict['group'] not in groups):
-                groups.append(keydict['group'])
+                if "init" not in keydict:
+                    groups.append(keydict['group'])
+
         return groups
 
 
@@ -819,7 +853,7 @@ class KittieParser(object):
         self.DetectFiletype()
 
         self.keydict = {}
-        self.keywords = ["step", "dir", "timefile", "group", "filename", "ierr", "varname", "varid", "io", "engine", "timeout"]
+        self.keywords = ["step", "dir", "timefile", "group", "filename", "ierr", "varname", "varid", "io", "engine", "timeout", "comm"]
         for key in self.keywords:
             self.keydict[key] = None
 
