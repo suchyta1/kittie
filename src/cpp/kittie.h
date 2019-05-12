@@ -68,9 +68,8 @@
 				void _CoupleOpen();
 				void _lockfile();
 				void begin_write();
-				bool FileSeek(const int step, const double timeout=-1.0);
+				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=-1.0);
 		};
-
 
 
 		// "Private"

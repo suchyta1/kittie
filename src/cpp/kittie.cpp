@@ -362,10 +362,9 @@ void kittie::Coupler::begin_write()
 }
 
 
-bool kittie::Coupler::FileSeek(const int step, const double timeout)
+adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const double timeout)
 {
 	adios2::StepStatus status;
-	bool found = false;
 	int current_step = -1;
 
 	AcquireLock();
@@ -393,14 +392,18 @@ bool kittie::Coupler::FileSeek(const int step, const double timeout)
 	}
 
 	ReleaseLock();
-	if (! found)
+	if (!found)
 	{
 		engine.Close();
 		io->RemoveAllVariables();
 		io->RemoveAllAttributes();
+		if (!kittie::Exists(filename + ".done"))
+		{
+			status = adios2::StepStatus::NotReady;
+		}
 	}
 
-	return found;
+	return status;
 }
 
 
@@ -434,27 +437,19 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 	{
 		if (LockFile)
 		{
-			while (! found)
+			while (!found)
 			{
-				found = FileSeek(step, timeout);
+				status = FileSeek(found, step, timeout);
 				if (timeout != -1)
 				{
 					break;
 				}
 			}
-			if (! found)
-			{
-				status = adios2::StepStatus::NotReady;
-			}
-			else
-			{
-				status = adios2::StepStatus::OK;
-			}
 		}
 
 		else
 		{
-			if (! init)
+			if (!init)
 			{
 				_CoupleOpen();
 			}
@@ -463,7 +458,6 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 	}
 
 	init = true;
-	//return engine;
 	return status;
 }
 
