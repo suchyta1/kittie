@@ -40,6 +40,7 @@
 				adios2::Mode mode;
 				MPI_Comm comm;
 				int rank;
+				int CurrentStep;
 				bool init;
 				bool LockFile;
 

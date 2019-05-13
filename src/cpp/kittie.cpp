@@ -222,6 +222,7 @@ void kittie::Coupler::_open(MPI_Comm incomm, const std::string infilename, const
 {
 	if (! init)
 	{
+		CurrentStep = -1;
 		MPI_Comm_dup(incomm, &comm);
 		int err = MPI_Comm_rank(comm, &rank);
 		filename = infilename;
@@ -385,6 +386,7 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 		if (current_step == step)
 		{
 			found = true;
+			CurrentStep++;
 			break;
 		}
 
@@ -409,18 +411,24 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 
 adios2::StepStatus kittie::Coupler::begin_step(const double timeout)
 {
+	adios2::StepStatus status;
+
 	if (mode == adios2::Mode::Write)
 	{
 		begin_write();
+		status = adios2::StepStatus::OK;
 	}
+
 	else if (mode == adios2::Mode::Read)
 	{
-		std::cerr << "If reading from file for coupling, must give what step you want to read from\n";
-		abort();
+		//std::cerr << "If reading from file for coupling, must give what step you want to read from\n";
+		//abort();
+		
+		status = begin_step(CurrentStep + 1);
 	}
+
 	init = true;
-	adios2::StepStatus status = adios2::StepStatus::OK;
-	//return engine;
+
 	return status;
 }
 
@@ -429,10 +437,13 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 {
 	bool found = false;
 	adios2::StepStatus status;
+
 	if (mode == adios2::Mode::Write)
 	{
 		begin_write();
+		status = adios2::StepStatus::OK;
 	}
+	
 	else if (mode == adios2::Mode::Read)
 	{
 		if (LockFile)
