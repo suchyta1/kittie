@@ -948,8 +948,11 @@ module kittie
 
 			if (.not.helper%alive) then
 				if (present(comm)) then
+					call mpi_comm_rank(comm, comm_rank, iierr)
+
 					helper%comm = comm
 					call mpi_comm_rank(helper%comm, helper%rank, iierr)
+
 				endif
 				helper%engine_type = which_engine(io)
 				helper%usesfile = uses_files(helper%engine_type)
