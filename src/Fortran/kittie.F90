@@ -328,18 +328,22 @@ module kittie
 
 		end subroutine lock_state
 
-		subroutine kittie_close(helper, ierr)
+		subroutine kittie_close(helper, iierr)
 			type(coupling_helper), intent(inout) :: helper
-			integer, intent(out) :: ierr
+			integer, intent(out), optional :: iierr
+			integer :: ierr
 			if (helper%engine%valid) then
 				call adios2_close(helper%engine, ierr)
 			end if
+			if (present(iierr)) then
+				iierr = ierr
+			end if
 		end subroutine kittie_close
 
-		subroutine kittie_couple_end_step(helper, ierr, time)
+		subroutine kittie_couple_end_step(helper, iierr)
 			type(coupling_helper), intent(inout) :: helper
-			integer, intent(out) :: ierr
-			logical, intent(in), optional :: time
+			integer, intent(out), optional :: iierr
+			integer :: ierr
 
 			if (helper%timed .and. use_mpi) then
 				helper%othertime(1) = mpi_wtime() - helper%othertime(1)
@@ -385,6 +389,10 @@ module kittie
 #				endif
 
 				call adios2_end_step(helper%timeengine, ierr)
+			end if
+
+			if (present(iierr)) then
+				iierr = ierr
 			end if
 
 		end subroutine kittie_couple_end_step
@@ -530,17 +538,18 @@ module kittie
 
 #		ifdef USE_MPI
 
-			subroutine kittie_initialize(comm, ierr, xml)
+			subroutine kittie_initialize(comm, xml, ierr)
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(in)  :: comm
-				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
+				integer, intent(out), optional :: ierr
 				character(len=:), allocatable :: filename
+				integer :: iierr
 
 				if (present(xml)) then
-					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, ierr)
+					call adios2_init(kittie_adios, trim(xml), comm, adios2_debug_mode_on, iierr)
 				else
-					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, ierr)
+					call adios2_init(kittie_adios, comm, adios2_debug_mode_on, iierr)
 				end if
 
 				filename = setup_file()
@@ -549,20 +558,36 @@ module kittie
 				call kittie_read_groups_file(  ".kittie-groups-" // trim(app_name) // ".nml")
 				deallocate(filename)
 
+				if (present(ierr)) then
+					ierr = iierr
+				end if
 			end subroutine kittie_initialize
 
 #		else
 
-			subroutine kittie_initialize(ierr, xml)
+			subroutine kittie_initialize(xml, ierr)
 				! Intialize Kittie's ADIOS-2 namespace
-				integer, intent(out) :: ierr
 				character(len=*), intent(in), optional :: xml
-				!if (present(xml)) then
-				!	call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
-				!else
-				!	call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
-				!end if
-				call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+				integer, intent(out), optional :: ierr
+				character(len=:), allocatable :: filename
+				integer :: iierr
+
+				if (present(xml)) then
+					call adios2_init(kittie_adios, trim(xml), adios2_debug_mode_on, ierr)
+				else
+					call adios2_init(kittie_adios, adios2_debug_mode_on, ierr)
+				end if
+
+				filename = setup_file()
+				call kittie_read_helpers_file(filename)
+				call kittie_read_codes_file(".kittie-codenames-" // trim(app_name) // ".nml")
+				call kittie_read_groups_file(  ".kittie-groups-" // trim(app_name) // ".nml")
+				deallocate(filename)
+
+				if (present(ierr)) then
+					ierr = iierr
+				end if
+
 			end subroutine kittie_initialize
 
 #		endif
@@ -588,11 +613,11 @@ module kittie
 		end subroutine kittie_declare_io
 
 
-		function KittieDeclareIO(groupname, ierr) result(io)
+		function KittieDeclareIO(groupname, iierr) result(io)
 			! Initialize a new Kittie coupling I/O group
 			character(len=*), intent(in) :: groupname
-			integer, intent(out) :: ierr
-			integer :: i, j
+			integer, intent(out), optional :: iierr
+			integer :: i, j, ierr
 			type(adios2_io) :: io
 			call adios2_declare_io(io, kittie_adios, trim(groupname), ierr)
 			do i=1, nnames
@@ -605,6 +630,10 @@ module kittie
 				end do
 
 			end do
+
+			if (present(iierr)) then
+				iierr = ierr
+			end if
 		end function KittieDeclareIO
 
 
@@ -861,25 +890,19 @@ module kittie
 		end subroutine kittie_get_real_8
 
 
-		subroutine kittie_couple_start(helper, filename, groupname, mode, comm, step, ierr, dir, timefile)
-			! Roughly the idea is push/fetch the given step, without worrying about how to do safely for different types of I/O.
-			! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
-
+		subroutine kittie_open(helper, groupname, filename, mode, comm, ierr, timefile)
 			type(coupling_helper), intent(inout) :: helper
-			character(len=*), intent(in) :: filename
 			character(len=*), intent(in) :: groupname
+			character(len=*), intent(in) :: filename
 			integer, intent(in) :: mode
 			integer, intent(in),  optional :: comm
-			integer, intent(in),  optional :: step
-			integer, intent(out), optional :: ierr
-			character(len=*), intent(in), optional :: dir
+			integer, intent(in),  optional :: ierr
 			character(len=*), intent(in), optional :: timefile
 
 			type(adios2_io) :: io, timingio
 			type(adios2_engine) :: engine
 			integer :: iierr, comm_rank, comm_size
 			integer(8), dimension(1) :: gdims, offs, locs
-			logical :: found
 
 			if (present(timefile) .and. use_mpi) then
 				helper%timed = .true.
@@ -920,29 +943,38 @@ module kittie
 				helper%timed = .false.
 			end if
 
+
 			call adios2_at_io(io, kittie_adios, trim(groupname), iierr)
 
 			if (.not.helper%alive) then
-				
 				if (present(comm)) then
 					helper%comm = comm
 					call mpi_comm_rank(helper%comm, helper%rank, iierr)
 				endif
-
 				helper%engine_type = which_engine(io)
 				helper%usesfile = uses_files(helper%engine_type)
-
 				helper%mode = mode
-				if (present(dir)) then
-					helper%filename = string_copy(trim(dir)//"/"//trim(filename))
-				else
-					helper%filename = string_copy(trim(filename))
-				end if
-			end if
-
-			if (.not.helper%alive) then
+				helper%filename = string_copy(trim(filename))
 				helper%io = io
 			end if
+
+		end subroutine kittie_open
+
+
+		subroutine kittie_couple_start(helper, step, ierr)
+			! Roughly the idea is push/fetch the given step, without worrying about how to do safely for different types of I/O.
+			! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
+
+			type(coupling_helper), intent(inout) :: helper
+			integer, intent(in),  optional :: step
+			integer, intent(out), optional :: ierr
+
+			type(adios2_io) :: io, timingio
+			type(adios2_engine) :: engine
+			integer :: iierr, comm_rank, comm_size
+			integer(8), dimension(1) :: gdims, offs, locs
+			logical :: found
+
 
 			if (helper%mode == adios2_mode_write) then
 				if (.not.helper%alive) then
