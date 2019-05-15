@@ -58,6 +58,7 @@
 				adios2::StepStatus begin_step(const double timeout=0.0);
 				void end_step();
 				void close();
+				void finalize();
 				void _open(MPI_Comm incomm, const std::string infilename, const adios2::Mode inmode);
 
 

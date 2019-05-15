@@ -497,9 +497,9 @@ module kittie
 		end subroutine kittie_couple_open
 
 
-		subroutine kittie_finalize(ierr)
-			integer, intent(out) :: ierr
-			integer :: i, rank
+		subroutine kittie_finalize(iierr)
+			integer, intent(out), optional :: iierr
+			integer :: i, rank, ierr
 
 			do i=1, size(helpers)
 				call kittie_close(helpers(i), ierr)
@@ -509,6 +509,10 @@ module kittie
 			end do
 
 			call adios2_finalize(kittie_adios, ierr)
+
+			if (present(iierr)) then
+				iierr = ierr
+			end if
 
 		end subroutine kittie_finalize
 

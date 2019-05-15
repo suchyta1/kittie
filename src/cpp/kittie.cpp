@@ -517,3 +517,8 @@ void kittie::Coupler::close()
 		kittie::Touch(fname);
 	}
 }
+
+void kittie::Coupler::finalize()
+{
+
+}

@@ -118,6 +118,8 @@ class BlockFiles(object):
         self.init = "@effis-init"
         self.initallowed = ["xml", "comm"]
 
+        self.final = "@effis-finalize"
+
 
     def Raise(self, msg, code=None):
         if code is not None:
@@ -454,6 +456,17 @@ class BlockFiles(object):
             OutText = FileText[:InitMatch.start()] + self.InitText(dictionary) + FileText[(InitMatch.end()+EndIndex):]
         return OutText
 
+    def AddFinal(self, FinalComp, FileText):
+        FinalMatch = FinalComp.search(FileText)
+        OutText = FileText
+
+        if FinalMatch is not None:
+            InnerText = FileText[FinalMatch.end():]
+            EndIndex = InnerText.find("\n")
+            line = InnerText[:EndIndex].strip()
+            OutText = FileText[:FinalMatch.start()] + self.FinalText() + FileText[(FinalMatch.end()+EndIndex):]
+        return OutText
+
 
     def AddHeader(self, FileText):
         for expr in self.HeadExpr:
@@ -490,18 +503,20 @@ class BlockFiles(object):
         self.TopDir = directory
         self.files = self.GrepFor(self.begin, self.files)
         self.files = self.GrepFor(self.init,  self.files)
+        self.files = self.GrepFor(self.final,  self.files)
 
 
     def MakeReplacements(self, outdir, groupnames, mimic=False, ignore=[], only=None, suffix="-kittie"):
         """ Go through the identified files, and replace ADIOS-2 statements with slightly updated ones to support Effis """
 
         InitExpr  = "{0}{1}".format(self.ReComment, self.init)
+        FinalExpr = "{0}{1}".format(self.ReComment, self.final)
         StartExpr = "{0}{1}".format(self.ReComment, self.begin)
         EndExpr   = "{0}{1}".format(self.ReComment, self.end)
         StartComp = re.compile(StartExpr, re.MULTILINE)
-        EndComp   = re.compile(EndExpr, re.MULTILINE)
-        #IOComp    = re.compile(self.DeclareAdios)
-        InitComp  = re.compile(InitExpr, re.MULTILINE)
+        EndComp   = re.compile(EndExpr,   re.MULTILINE)
+        InitComp  = re.compile(InitExpr,  re.MULTILINE)
+        FinalComp = re.compile(FinalExpr, re.MULTILINE)
 
         self.groupnames = []
         for filename in self.files:
@@ -517,6 +532,9 @@ class BlockFiles(object):
 
             # Look for init
             FileText = self.AddInit(InitComp, FileText)
+
+            # Look for finalize
+            FileText = self.AddFinal(FinalComp, FileText)
 
 
             # Get the bounds of the replacement blocks
@@ -597,6 +615,9 @@ class CppBlocks(BlockFiles):
                 args += [keydict[key]]
         args += ['adios2::DebugON']
         return "kittie::initialize({0});".format(', '.join(args))
+
+    def FinalText(self):
+        return "kittie::finalize();".format()
 
     def DeclareText(self, args, IOName, IOobj=None):
         if IOobj is None:
@@ -680,12 +701,15 @@ class FortranBlocks(BlockFiles):
         return self.call + "adios2_begin_step" + self.spaceslash + "\((.*{0}.*)\)".format(engine)
 
     def InitText(self, keydict):
-        for key in self.initallowed:
-            if 'comm' in keydict:
-                args += [keydict[key]]
-            if 'xml' in keydict:
-                args += [keydict[key]]
+        args = []
+        if 'comm' in keydict:
+            args += [keydict['comm']]
+        if 'xml' in keydict:
+            args += [keydict['xml']]
         return "call kittie_initialize({0})".format(', '.join(args))
+
+    def FinalText(self):
+        return "call kittie_finalize()"
 
     def DeclareText(self, args, IOName, IOObj=None):
         return "{0} = KittieDeclareIO({1}, {2})".format(args[0], IOName, args[3])
