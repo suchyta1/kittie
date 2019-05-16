@@ -49,6 +49,7 @@ module kittie
 		integer :: mode
 		integer :: comm
 		integer :: rank
+		integer :: CurrentStep
 		logical :: usesfile
 		logical :: alive=.false.
 		character(len=:), allocatable :: engine_type
@@ -963,6 +964,7 @@ module kittie
 				helper%mode = mode
 				helper%filename = string_copy(trim(filename))
 				helper%io = io
+				helper%CurrentStep = -1
 			end if
 
 		end subroutine kittie_open
@@ -978,9 +980,13 @@ module kittie
 
 			type(adios2_io) :: io, timingio
 			type(adios2_engine) :: engine
-			integer :: iierr, comm_rank, comm_size
+			integer :: iierr, comm_rank, comm_size, istep
 			integer(8), dimension(1) :: gdims, offs, locs
 			logical :: found
+
+			if (present(step)) then
+				istep = step
+			end if
 
 
 			if (helper%mode == adios2_mode_write) then
@@ -1002,15 +1008,16 @@ module kittie
 
 				if (helper%usesfile) then
 					if (.not.present(step)) then
-						write (*, "('If reading from file for coupling, must give what step you want to read from')")
-						stop
+						!write (*, "('If reading from file for coupling, must give what step you want to read from')")
+						!stop
+						istep = helper%CurrentStep + 1
 					end if
 
 					!call file_seek(helper, step)
 
 					found = .false.
 					do while (.not.found)
-						found = file_seek(helper, step)
+						found = file_seek(helper, istep)
 					end do
 
 				else
