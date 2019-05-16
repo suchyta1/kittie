@@ -744,8 +744,29 @@ class KittieJob(cheetah.Campaign):
                 outfile.write('bsub {0}'.format(self.config['machine'][self.keywords['script']]))
 
 
+    def CopyInput(self, yamlfile):
+        if len(self.config[self.keywords['include']]) > 0:
+            outdir = os.path.join(self.config[self.keywords['rundir']], '.kittie-input')
+            os.makedirs(outdir)
+
+        for filename in self.config[self.keywords['include']]:
+            shutil.copy(filename, os.path.join(outdir, os.path.basename(filename)))
+
+        shutil.copy(yamlfile, os.path.join(outdir, os.path.basename(yamlfile)))
+
+        for k, codename in enumerate(self.codenames):
+            try:
+                filename = self.codesetup[codename]['setup-file']
+            except:
+                filename = None
+
+            if (filename is not None) and os.path.exists(filename):
+                basename = ".{0}".format(codename) + os.path.basename(filename)
+                shutil.copy(filename, os.path.join(outdir, basename))
+
 
     def __init__(self, yamlfile):
+        YamlFile = os.path.realpath(yamlfile)
         self.LoggerSetup()
         self.init(yamlfile)
         super(KittieJob, self).__init__(self.machine, "")
@@ -769,7 +790,10 @@ class KittieJob(cheetah.Campaign):
         self.WritePlotsFile()
 
         self.FromScript()
+        self.CopyInput(YamlFile)
         self.MoveLog()
+
+
 
 
 if __name__ == "__main__":
