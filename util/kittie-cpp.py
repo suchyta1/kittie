@@ -274,7 +274,6 @@ class BlockFiles(object):
             status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=1)
 
         if (InternalText[match.start():].strip()[0] == "=") or (self.language == "fortran"):
-            self.logger.debug("args: {0}".format(BeginArgs))
             NewInner += InternalText[UpdatePos:match.start()] + self.BeginText(TmpMap[NameKey], BeginArgStr, BeginArgs, TmpMap['keys'], engine, equal=True)
         else:
             NewInner += InternalText[UpdatePos:match.end(2)] + self.BeginText(TmpMap[NameKey], BeginArgStr, BeginArgs, TmpMap['keys'], engine, equal=False)
@@ -518,7 +517,7 @@ class BlockFiles(object):
         self.files = self.GrepFor(self.final,  self.files)
 
 
-    def MakeReplacements(self, outdir, groupnames, mimic=False, ignore=[], only=None, suffix="-kittie"):
+    def MakeReplacements(self, outdir, groupnames, ignore=[], only=None, suffix="-kittie"):
         """ Go through the identified files, and replace ADIOS-2 statements with slightly updated ones to support Effis """
 
         InitExpr  = "{0}{1}".format(self.ReComment, self.init)
@@ -582,7 +581,7 @@ class BlockFiles(object):
             # Whatever is remaining in the file
             UpdatedText += FileText[UpdatedPos:]
 
-            if mimic:
+            if outdir is not None:
                 RelativeFromTop = os.path.dirname(self.TmpFilename.replace(self.TopDir, "").lstrip("/"))
                 OutSubdir = os.path.join(outdir, RelativeFromTop)
                 base, ext = os.path.splitext(os.path.basename(self.TmpFilename))
@@ -785,12 +784,15 @@ if __name__ == "__main__":
 
     RepoParser = subparsers.add_parser("repo", help="Process code repository to determine its KITTIE-dependent files and group names")
     RepoParser.add_argument("directory", help="Code repository to look through for KITTIE markups")
-    RepoParser.add_argument("outdir", help="Output groups namelist file")
+
+    #RepoParser.add_argument("outdir", help="Output groups namelist file")
+    RepoParser.add_argument("-t", "--tree-output", help="Write replacment files into directories mimic the source directories", type=str, default=None)
+    RepoParser.add_argument("-c", "--confdir",     help="Output directory where the configuration file writes", type=str, default=None)
+
     RepoParser.add_argument("-s", "--suffix", help="String to append to file names when replaced", type=str, default="-kittie")
     RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
     RepoParser.add_argument("-k", "--skip", help="Groups to skip", type=str, default="")
     RepoParser.add_argument("-o", "--only", help="Groups to keep", type=str, default="")
-    RepoParser.add_argument("-m", "--mimic", help="Mimic", action='store_true', default=False)
     RepoParser.set_defaults(which='repo')
 
     FileParser = subparsers.add_parser("file", help="Process one source file and replace KITTIE markups with appropriate APIs")
@@ -830,9 +832,12 @@ if __name__ == "__main__":
         BlockFinders = [FortranBlocks(), CppBlocks()]
         for finder in BlockFinders:
             finder.FindFiles(args.directory)
-            groupnames = finder.MakeReplacements(args.outdir, groupnames, mimic=args.mimic, ignore=args.skip, only=args.only, suffix=args.suffix)
+            #groupnames = finder.MakeReplacements(args.outdir, groupnames, mimic=args.mimic, ignore=args.skip, only=args.only, suffix=args.suffix)
+            groupnames = finder.MakeReplacements(args.tree_output, groupnames, ignore=args.skip, only=args.only, suffix=args.suffix)
 
         if args.name is None:
             args.name = os.path.basename(args.directory)
-        WriteGroupsFile(groupnames, args.outdir, args.name)
+        if args.confdir is None:
+            args.confdir = args.directory
+        WriteGroupsFile(groupnames, args.confdir, args.name)
 
