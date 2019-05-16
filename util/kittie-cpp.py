@@ -70,7 +70,7 @@ def GetArgumentList(text, end=False):
     else:
         return alist
 
-
+"""
 def EqualStart(text, start, cond=True):
     old = start
     while cond:
@@ -84,6 +84,7 @@ def EqualStart(text, start, cond=True):
         return old
     else:
         return start
+"""
 
 def SplitOn(txt, splitkey):
     outarr = []
@@ -219,9 +220,12 @@ class BlockFiles(object):
         return InnerText[EndIndex+1:], self.TmpBegin+EndIndex+1
 
 
-    def ArgsObj(self, InnerText, match, mpos=1, fpos=0, vpos=None, remove=[], size=None):
+    #def ArgsObj(self, InnerText, match, mpos=1, fpos=0, vpos=None, remove=[], size=None):
+    def ArgsObj(self, InnerText, match, mpos=1, fpos=0, vpos=None):
         ArgsStr = match.group(mpos)
         Args = SplitOn(ArgsStr, ',')
+
+        """
         TmpArgs = None
 
         if (len(remove) > 0) and (len(Args) == size):
@@ -230,8 +234,10 @@ class BlockFiles(object):
                 if i not in remove:
                     TmpArgs += [arg]
             ArgsStr = ", ".join(TmpArgs)
+        """
 
         if self.language == "fortran":
+            #GetArgumentList(text, end=False)
             if len(Args) > fpos:
                 val = Args[fpos]
             else:
@@ -261,26 +267,29 @@ class BlockFiles(object):
 
     def ForwardReplaceBegin(self, match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName'):
         if self.language == "c++":
-            status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=3, remove=[0], size=2)
+            #status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=3, remove=[0], size=2)
+            status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=3)
+            BeginArgStr = ', '.join(BeginArgs[1:])
         else:
-            status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=0, remove=[0], size=2)
+            status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=1)
 
         if (InternalText[match.start():].strip()[0] == "=") or (self.language == "fortran"):
-            NewInner += InternalText[UpdatePos:match.start()] + self.BeginText(TmpMap[NameKey], BeginArgStr, TmpMap['keys'], engine, equal=True)
+            self.logger.debug("args: {0}".format(BeginArgs))
+            NewInner += InternalText[UpdatePos:match.start()] + self.BeginText(TmpMap[NameKey], BeginArgStr, BeginArgs, TmpMap['keys'], engine, equal=True)
         else:
-            NewInner += InternalText[UpdatePos:match.end(2)] + self.BeginText(TmpMap[NameKey], BeginArgStr, TmpMap['keys'], engine, equal=False)
+            NewInner += InternalText[UpdatePos:match.end(2)] + self.BeginText(TmpMap[NameKey], BeginArgStr, BeginArgs, TmpMap['keys'], engine, equal=False)
         UpdatePos = match.end()
         return status, NewInner, UpdatePos
 
     def ForwardReplaceEnd(self, match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName'):
         nothing, EndArgStr, EndArgs = self.ArgsObj(InternalText, match)
-        NewInner += InternalText[UpdatePos:match.start()] + self.EndText(TmpMap[NameKey], EndArgStr, engine)
+        NewInner += InternalText[UpdatePos:match.start()] + self.EndText(TmpMap[NameKey], EndArgStr, EndArgs, engine)
         UpdatePos = match.end()
         return nothing, NewInner, UpdatePos
 
     def ForwardReplaceClose(self, match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName'):
         nothing, EndArgStr, EndArgs = self.ArgsObj(InternalText, match)
-        NewInner += InternalText[UpdatePos:match.start()] + self.CloseText(TmpMap[NameKey], EndArgStr, TmpMap['keys'])
+        NewInner += InternalText[UpdatePos:match.start()] + self.CloseText(TmpMap[NameKey], EndArgStr, EndArgs, TmpMap['keys'])
         UpdatePos = match.end()
         return nothing, NewInner, UpdatePos
 
@@ -292,7 +301,10 @@ class BlockFiles(object):
         return name, NewInner, UpdatePos
 
     def ReverseReplaceOpen(self, match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName'):
-        io, OpenArgsStr, OpenArgs = self.ArgsObj(InternalText, match, fpos=2, vpos=1, mpos=2)
+        if self.language == "c++":
+            io, OpenArgsStr, OpenArgs = self.ArgsObj(InternalText, match, fpos=2, vpos=1, mpos=2)
+        else:
+            io, OpenArgsStr, OpenArgs = self.ArgsObj(InternalText, match, fpos=2, vpos=1, mpos=1)
         NewInner += InternalText[UpdatePos:match.start()] + self.OpenText(TmpMap[NameKey], OpenArgsStr, OpenArgs, TmpMap['EngineObj'], TmpMap['keys'], EngineObj=TmpMap['EngineObj'])
         UpdatePos = match.end()
         return io, NewInner, UpdatePos
@@ -637,7 +649,7 @@ class CppBlocks(BlockFiles):
             base += ";\n" + "{2} = kittie::Couplers[{0}]->begin_step({1})".format(IOName, step, engine)
         return base
 
-    def BeginText(self, Name, argstr, keys, engine, equal=True):
+    def BeginText(self, Name, argstr, argarr, keys, engine, equal=True):
         if 'step' in keys:
             if (keys['step'].lower() == 'off'):
                 step = 0
@@ -662,11 +674,11 @@ class CppBlocks(BlockFiles):
         return base
 
 
-    def EndText(self, Name, argstr, engine):
+    def EndText(self, Name, argstr, args, engine):
         base = "kittie::Couplers[{0}]->end_step({1})".format(Name, argstr)
         return base
 
-    def CloseText(self, Name, argstr, keys):
+    def CloseText(self, Name, argstr, args, keys):
         base = "kittie::Couplers[{0}]->close({1})".format(Name, argstr)
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
@@ -727,16 +739,17 @@ class FortranBlocks(BlockFiles):
         base = self.HelperLine(IOName) + "\n" + "call kittie_open(common_helper, {0}, {1})".format(IOName, ArgsStr)
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
-            base += "\n" + "call kittie_couple_start(common_helper, {0})".format(step)
+            base += "\n" + "call kittie_couple_start(common_helper, {0}, {1})".format(step, args[-1])
         base += "\n" + self.EngineLine(engine)
         return base
 
     # I'm not using timeout or status yet
-    def BeginText(self, IOName, argstr, keys, engine, equal=True):
+    def BeginText(self, IOName, argstr, argarr, keys, engine, equal=True):
         args = []
 
         if 'step' in keys:
-            args+= "step={0}".format(keys['step'])
+            args+= ["step={0}".format(keys['step'])]
+        args += ["ierr={0}".format(argarr[-1])]
 
         if len(args) > 0:
             base = self.HelperLine(IOName) + "\n" + "call kittie_couple_start(common_helper, {0})".format(', '.join(args))
@@ -747,16 +760,16 @@ class FortranBlocks(BlockFiles):
         return base
 
 
-    def EndText(self, Name, argstr, engine):
-        base = self.HelperLine(Name) + "\n" + "call kittie_couple_end_step(common_helper)" + "\n" + self.EngineLine(engine)
+    def EndText(self, Name, argstr, args, engine):
+        base = self.HelperLine(Name) + "\n" + "call kittie_couple_end_step(common_helper, {0})".format(args[-1]) + "\n" + self.EngineLine(engine)
         return base
 
-    def CloseText(self, Name, argstr, keys):
-        base = "kittie_close(common_helper)".format(Name, argstr)
+    def CloseText(self, Name, argstr, args, keys):
+        base = "kittie_close(common_helper, {0})".format(args[-1])
 
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
-            base = self.HelperLine(Name) + "\n" + "call kittie_couple_end_step(common_helper)" + '\n' + base
+            base = self.HelperLine(Name) + "\n" + "call kittie_couple_end_step(common_helper, {0})".format(args[-1]) + '\n' + base
         else:
             base = self.HelperLine(Name) + "\n" + base
 
