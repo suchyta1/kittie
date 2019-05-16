@@ -8,6 +8,7 @@ import re
 import subprocess
 import yaml
 import logging
+import shutil
 import kittie_common
 
 
@@ -776,6 +777,12 @@ class FortranBlocks(BlockFiles):
         return base
 
 
+def Tar(directory, outdir):
+    name = ".src.tar.gz"
+    subprocess.call(["tar", "-czf", name, directory])
+    shutil.move(name, os.path.join(outdir, name))
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -826,18 +833,19 @@ if __name__ == "__main__":
 
     # Need to implement single file version
     if args.which == "repo":
-        thisfile = os.path.realpath(__file__)
-
-        groupnames = []
-        BlockFinders = [FortranBlocks(), CppBlocks()]
-        for finder in BlockFinders:
-            finder.FindFiles(args.directory)
-            #groupnames = finder.MakeReplacements(args.outdir, groupnames, mimic=args.mimic, ignore=args.skip, only=args.only, suffix=args.suffix)
-            groupnames = finder.MakeReplacements(args.tree_output, groupnames, ignore=args.skip, only=args.only, suffix=args.suffix)
 
         if args.name is None:
             args.name = os.path.basename(args.directory)
         if args.confdir is None:
             args.confdir = args.directory
+
+        Tar(args.directory, args.confdir)
+
+        groupnames = []
+        BlockFinders = [FortranBlocks(), CppBlocks()]
+        for finder in BlockFinders:
+            finder.FindFiles(args.directory)
+            groupnames = finder.MakeReplacements(args.tree_output, groupnames, ignore=args.skip, only=args.only, suffix=args.suffix)
+
         WriteGroupsFile(groupnames, args.confdir, args.name)
 
