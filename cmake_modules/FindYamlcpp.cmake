@@ -16,5 +16,5 @@ if(NOT YAML_H)
 endif(NOT YAML_H)
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(YAMLCPP REQUIRED_VARS YAML_INCLUDE_DIRS libyamlcpp)
+find_package_handle_standard_args(Yamlcpp REQUIRED_VARS YAML_INCLUDE_DIRS libyamlcpp)
 
