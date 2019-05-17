@@ -12,6 +12,7 @@ Some examples of extensions that EFFIS provide beyond ADIOS alone are:
 * Identical job creation on different platforms
 * Automated plotting (e.g. to be connected to a dashboard)
 * Performance timing
+* Source code, input configuration, etc. capture
 
 
 ## Topics

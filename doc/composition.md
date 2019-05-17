@@ -68,7 +68,8 @@ The `machine` section is required. Possible names include `local`, `summit`, `th
 `job_setup` is a script to source that runs before the actual codes start, like from a batch file if running through a scheduler.
 
 The `run` section is where the codes to run are defined. 
-`path` is where the executables live in the file system and `args` specify any command line arguments for the them.
+`path` is where the executables live in the file system (make sure appropriate `.kittie-setup.yaml` / `kittie-setup.nml` is in same directory)
+and `args` specify any command line arguments for the them.
 The names `gray-scott` and `pdf` aren't special, they're just labels.
 Each code will run in its own directory under `rundir`, named by these labels.
 There are settings to indicate how many total processes to run, and how many are on each node.

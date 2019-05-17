@@ -7,7 +7,7 @@ The dependencies for EFFIS itself are rather light.
 
 * [ADIOS-2](https://github.com/ornladios/ADIOS2) 
 
-    EFFIS uese/requires MPI if ADIOS does, and does not use MPI if ADIOS does not.
+    EFFIS uses/requires MPI if ADIOS does, and does not use MPI if ADIOS does not.
 
 * [Python](https://www.python.org/)
 
@@ -22,6 +22,12 @@ So it is fine to have separate EFFIS libraries on the login and compute nodes, i
 * [yaml-cpp](https://github.com/jbeder/yaml-cpp/)
  
 	This is actually only used from the C++ code, but at the moment, CMake requires finding yaml-cpp regardless if C++ is needed or not.
+
+* [PyYAML](https://pyyaml.org/)
+
+    Need for pre-processing and job composition, so on both login and compute nodes.
+
+Note: Cheetah and PyYAML are Python modules. I don't actually check for them to install EFFIS.
 
 
 ## EFFIS
@@ -46,18 +52,4 @@ cmake \
 * **USE_MPI**: Turn MPI on or off
 * **CMAKE_INSTALL_PREFIX**: Where you want EFFIS to install
 * **CMAKE_PREFIX_PATH**: Directories where dependencies are installed
-
-
-I've never quite been able to figure out how to get the Python installation to work correctly under CMake, 
-so the Python installation is done as an extra step after the usual `cmake` followed by `make`.
-I will figure out how to fix this soon, so the Python part is automatic.
-
-```
-mkdir build
-cd build
-cmake $(BUILD_VARIABLES) ../
-make
-cd ../src/Python
-pip install --prefix $EFFIS_PYTHON_MODULE_PATH .
-```
 
