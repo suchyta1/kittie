@@ -8,7 +8,6 @@ import re
 import subprocess
 import yaml
 import logging
-import shutil
 import kittie_common
 
 
@@ -778,9 +777,10 @@ class FortranBlocks(BlockFiles):
 
 
 def Tar(directory, outdir):
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     name = ".src.tar.gz"
-    subprocess.call(["tar", "-czf", name, directory])
-    shutil.move(name, os.path.join(outdir, name))
+    subprocess.call(["tar", "-czf", os.path.join(outdir, name), directory])
 
 
 if __name__ == "__main__":

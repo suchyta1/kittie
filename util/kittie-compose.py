@@ -134,7 +134,6 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config['machine'], 'submit_setup', value=None, level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'script', value=None, level=logging.INFO)
 
-        self._SetIfNotFound(self.config['machine'], 'runner_extra', value="", level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'scheduler_args', value=None, level=logging.INFO)
 
 
@@ -770,12 +769,6 @@ class KittieJob(cheetah.Campaign):
         self.LoggerSetup()
         self.init(yamlfile)
         super(KittieJob, self).__init__(self.machine, "")
-
-        """
-        if self.config['machine']['runner_extra'] is None:
-            self.config['machine']['runner_extra'] = ""
-        self.make_experiment_run_dir(self.output_dir, runner_extra=self.config['machine']['runner_extra'])
-        """
         self.make_experiment_run_dir(self.output_dir)
 
         if self.config['machine'][self.keywords['script']] is not None:
