@@ -744,9 +744,8 @@ class KittieJob(cheetah.Campaign):
 
 
     def CopyInput(self, yamlfile):
-        if len(self.config[self.keywords['include']]) > 0:
-            outdir = os.path.join(self.config[self.keywords['rundir']], '.kittie-input')
-            os.makedirs(outdir)
+        outdir = os.path.join(self.config[self.keywords['rundir']], '.kittie-input')
+        os.makedirs(outdir)
 
         for filename in self.config[self.keywords['include']]:
             shutil.copy(filename, os.path.join(outdir, os.path.basename(filename)))
