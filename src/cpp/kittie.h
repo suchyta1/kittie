@@ -1,6 +1,7 @@
 #ifndef __KITTIE_H__
 #	define __KITTIE_H__
 
+#define NOTHING
 
 #	include <stdlib.h>
 #	include <string>

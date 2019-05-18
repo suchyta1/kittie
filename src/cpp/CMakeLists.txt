@@ -3,11 +3,13 @@ add_definitions(-std=c++11)
 
 if(USE_MPI)
 	add_definitions(-DUSE_MPI)
+	execute_process(COMMAND sed "s/#define NOTHING/#define USE_MPI/g" ${CMAKE_CURRENT_SOURCE_DIR}/kittie.h OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/kittie.h)
+	message(STATUS "OUT: ${out}")
 endif()
 
 set(lib_objects ${CMAKE_CURRENT_SOURCE_DIR}/kittie.cpp)
 add_library(kittie ${lib_objects})
 target_link_libraries(kittie PRIVATE ${libadios2} ${libyamlcpp})
 install(TARGETS kittie DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/kittie.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/kittie.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 
