@@ -5,7 +5,7 @@ a source-to-source engine that goes through the source files making the updates 
 As it does so, it makes a list of the groups it finds that use EFFIS, and writes out a small text file called 
 `.kittie-setup.yaml` (`.kittie-setup.nml` for Fortran) that EFFIS will read at job time when the program starts.
 
-Using `kittie-cpp.py` like:
+Using `kittie-cpp.py` looks like:
 
 ```
 kittie-cpp.py repo $REPO_TOP
@@ -19,7 +19,6 @@ Options:
 * `--tree-output` Ordinarily, updated source files write into the same directory as the corresponding source file. Setting `--tree-output` to
 to a directory sends the output files to this directory, into subdirectories mimicking the original directory structure
 * `--confdir`     Where the setup file writes. Default is $REPO_TOP
-them into $OUPUT_ DIR using a mimicked directory structure.
 * `--name`        A name for the application. This is written into the setup file. The default is the repository top directory name.
 This only affects things that happen behind the scenes.
 

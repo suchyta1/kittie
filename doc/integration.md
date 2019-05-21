@@ -167,7 +167,7 @@ Now let's make things a little more interesting. Here is a reader for the Gray-S
 
     // IO objects for reading and writing
 	
-	//@effis-begin reader_io-->"ConcentrationData", step=kstep; writer--->"PDFData"
+	//@effis-begin reader_io-->"ConcentrationData"; writer--->"PDFData"
     adios2::IO reader_io = ad.DeclareIO("SimulationOutput");
     adios2::IO writer_io = ad.DeclareIO("PDFAnalysisOutput");
 ```
@@ -224,12 +224,12 @@ Here, we see that we can markup multiple I/Os in the same code area, where the d
 We can also define the pragmas in terms of original `adios2::IO` or `adios2::Engine` objects instead of the original names.
 (But we still use a name for reference within the EFFIS features.)
 Notice that the `reader_io` is linked with the same group we wrote out in the writer.
-The reader also has a `step` tag, which tells us what step we want to read from the input.
+
+The reader could also has a `step` tag, which tells us what step we want to read from the input.
 It's not really necessary in thins example for memory based transport (e.g. SST, InSituMPI) -- we look for a new step, wait if we don't find anything,
-and abort when the status is no longer valid. We need the step when using files, because steps append to the file,
-and there isn't a native ADIOS way to safely do this in a concise way. (You have to do things like like for lock files or write each step to a separate file.)
-Conceptually, `step` shouldn't be needed with files either for this examples (though you can easily imagine couplings that don't just read the most recent step),
-and I will make a further update to the code so `step` can be omitted in examples like these.
+and abort when the status is no longer valid. 
+In ADIOS, steps append to files, but there isn't a native ADIOS-only way to safely seek through these files files while they're still open,
+(At least not in a concise way; you have to do things like like for lock files or write each step to a separate file.)
 
 There's nothing else specific that I'll point about about the remainder of the code, but it's included below.
 
