@@ -220,20 +220,29 @@ adios2::Engine kittie::open(const std::string groupname, const std::string filen
 
 void kittie::Coupler::_open(MPI_Comm incomm, const std::string infilename, const adios2::Mode inmode)
 {
-	if (! init)
+	if (!init)
 	{
+		mode = inmode;
 		CurrentStep = -1;
 		MPI_Comm_dup(incomm, &comm);
 		int err = MPI_Comm_rank(comm, &rank);
+		_lockfile();
+	}
+	
+	if (!opened)
+	{
+		// Moved this block so different files can be used per step for same group
 		filename = infilename;
 		cwriting = filename + kittie::writing;
 		creading = filename + kittie::myreading;
+		allcreading.clear();
 		for(std::size_t i=0; i<kittie::allreading.size(); i++)
 		{
 			allcreading.push_back(filename + kittie::allreading[i]);
 		}
-		mode = inmode;
-		_lockfile();
+
+		// This will wait for the file to exist if reading
+		_CoupleOpen();
 	}
 }
 
@@ -241,6 +250,7 @@ void kittie::Coupler::_open(MPI_Comm incomm, const std::string infilename, const
 kittie::Coupler::Coupler(const std::string ingroupname)
 {
 	init = false;
+	opened = false;
 	groupname = ingroupname;
 }
 
@@ -342,6 +352,8 @@ void kittie::Coupler::_CoupleOpen()
 	{
 		ReleaseLock();
 	}
+
+	opened = true;
 }
 
 
@@ -355,7 +367,8 @@ void kittie::Coupler::_lockfile()
 
 void kittie::Coupler::begin_write()
 {
-	if (! init)
+	//if (!init)
+	if (!opened)
 	{
 		_CoupleOpen();
 	}
@@ -369,7 +382,11 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 	int current_step = -1;
 
 	AcquireLock();
-	engine = io->Open(filename, mode);
+	if (!opened)
+	{
+		engine = io->Open(filename, mode);
+		opened = true;
+	}
 
 	while (true)
 	{
@@ -397,6 +414,7 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 	if (!found)
 	{
 		engine.Close();
+		opened = false;
 		io->RemoveAllVariables();
 		io->RemoveAllAttributes();
 		if (!kittie::Exists(filename + ".done"))
@@ -460,7 +478,9 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 
 		else
 		{
-			if (!init)
+			// This block shouldn't really be necessary with proper ADIOS
+			//if (!init)
+			if (!opened)
 			{
 				_CoupleOpen();
 			}
@@ -488,6 +508,7 @@ void kittie::Coupler::end_step()
 		if (mode == adios2::Mode::Read)
 		{
 			engine.Close();
+			opened = false;
 			io->RemoveAllVariables();
 			io->RemoveAllAttributes();;
 		}
@@ -505,6 +526,7 @@ void kittie::Coupler::close()
 			AcquireLock();
 		}
 		engine.Close();
+		opened = false;
 		if (LockFile)
 		{
 			ReleaseLock();

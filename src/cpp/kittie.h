@@ -43,6 +43,7 @@
 				int rank;
 				int CurrentStep;
 				bool init;
+				bool opened;
 				bool LockFile;
 
 

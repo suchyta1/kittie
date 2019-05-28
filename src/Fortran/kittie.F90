@@ -52,6 +52,7 @@ module kittie
 		integer :: CurrentStep
 		logical :: usesfile
 		logical :: alive=.false.
+		logical :: fileopened=.false.
 		character(len=:), allocatable :: engine_type
 
 		logical :: timed=.false., timeinit=.false.
@@ -333,8 +334,9 @@ module kittie
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(out), optional :: iierr
 			integer :: ierr
-			if (helper%engine%valid) then
+			if (helper%fileopened) then
 				call adios2_close(helper%engine, ierr)
+				helper%fileopened = .false.
 			end if
 			if (present(iierr)) then
 				iierr = ierr
@@ -371,6 +373,7 @@ module kittie
 				if (helper%mode == adios2_mode_read) then
 					call adios2_close(helper%engine, ierr)
 					call adios2_remove_all_variables(helper%io, ierr)
+					helper%fileopened = .false.
 				end if
 			end if
 
@@ -421,7 +424,6 @@ module kittie
 		end function uses_files
 
 
-		!recursive subroutine file_seek(helper, step)
 		function file_seek(helper, step) result(found)
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(in) :: step
@@ -433,11 +435,14 @@ module kittie
 			current_step = -1
 			call lock_state(helper, .true.)
 
-#			ifdef USE_MPI
-				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
-#			else
-				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, ierr)
-#			endif
+			if (.not.helper%fileopened) then
+#				ifdef USE_MPI
+					call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
+#				else
+					call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, ierr)
+#				endif
+				helper%fileopened = .true.
+			endif
 
 
 			do while (.true.)
@@ -461,7 +466,7 @@ module kittie
 			if (.not.found) then
 				call adios2_close(helper%engine, ierr)
 				call adios2_remove_all_variables(helper%io, ierr)
-				!call file_seek(helper, step)
+				helper%fileopened = .false.
 			end if
 
 		end function file_seek
@@ -495,6 +500,8 @@ module kittie
 			if (helper%usesfile) then
 				call lock_state(helper, .false.)
 			end if
+
+			helper%fileopened = .true.
 		end subroutine kittie_couple_open
 
 
@@ -909,7 +916,10 @@ module kittie
 			integer :: iierr, comm_rank, comm_size
 			integer(8), dimension(1) :: gdims, offs, locs
 
-			if (present(timefile) .and. use_mpi) then
+			call adios2_at_io(io, kittie_adios, trim(groupname), iierr)
+
+
+			if (present(timefile) .and. use_mpi .and. .not.helper%alive) then
 				helper%timed = .true.
 				helper%timingfile = string_copy(timefile)
 				helper%timinggroup = string_copy(trim(groupname)//"-timing")
@@ -949,22 +959,24 @@ module kittie
 			end if
 
 
-			call adios2_at_io(io, kittie_adios, trim(groupname), iierr)
 
 			if (.not.helper%alive) then
 				if (present(comm)) then
 					call mpi_comm_rank(comm, comm_rank, iierr)
-
 					helper%comm = comm
 					call mpi_comm_rank(helper%comm, helper%rank, iierr)
-
 				endif
 				helper%engine_type = which_engine(io)
 				helper%usesfile = uses_files(helper%engine_type)
 				helper%mode = mode
-				helper%filename = string_copy(trim(filename))
-				helper%io = io
 				helper%CurrentStep = -1
+			end if
+
+
+			if (.not.helper%fileopened) then
+				helper%io = io
+				helper%filename = string_copy(trim(filename))
+				call kittie_couple_open(helper)
 			end if
 
 		end subroutine kittie_open
@@ -990,7 +1002,7 @@ module kittie
 
 
 			if (helper%mode == adios2_mode_write) then
-				if (.not.helper%alive) then
+				if (.not.helper%fileopened) then
 					call kittie_couple_open(helper)
 				end if
 
@@ -1013,15 +1025,13 @@ module kittie
 						istep = helper%CurrentStep + 1
 					end if
 
-					!call file_seek(helper, step)
-
 					found = .false.
 					do while (.not.found)
 						found = file_seek(helper, istep)
 					end do
 
 				else
-					if (.not.helper%alive) then
+					if (.not.helper%fileopened) then
 						call kittie_couple_open(helper)
 					end if
 
