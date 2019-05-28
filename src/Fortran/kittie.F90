@@ -334,10 +334,18 @@ module kittie
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(out), optional :: iierr
 			integer :: ierr
+
 			if (helper%fileopened) then
+				if (helper%usesfile) then
+					call lock_state(helper, .true.)
+				end if
 				call adios2_close(helper%engine, ierr)
 				helper%fileopened = .false.
+				if (helper%usesfile) then
+					call lock_state(helper, .false.)
+				end if
 			end if
+
 			if (present(iierr)) then
 				iierr = ierr
 			end if

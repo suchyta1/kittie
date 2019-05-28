@@ -169,6 +169,15 @@ void kittie::_yaml_setup()
 
 void kittie::finalize() 
 {
+	for(std::map<std::string, kittie::Coupler*>::iterator it=kittie::Couplers.begin(); it!=kittie::Couplers.end(); ++it)
+	{
+		if (it->second->mode == adios2::Mode::Write)
+		{
+			std::string fname = it->second->filename + ".done";
+			kittie::Touch(fname);
+		}
+	}
+
 	delete kittie::adios;
 }
 
@@ -183,7 +192,7 @@ adios2::IO kittie::declare_io(const std::string groupname)
 	if ( kittie::setengines.find(groupname) != kittie::setengines.end() )
 	{
 		io->SetEngine(setengines[groupname]);
-		for(std::map<std::string, std::string>::iterator it=setparams[groupname].begin(); it!=setparams[groupname].end(); ++it)
+		for(std::map<std::string, std::string>::iterator it=kittie::setparams[groupname].begin(); it!=kittie::setparams[groupname].end(); ++it)
 		{
 			io->SetParameter(it->first, it->second);
 		}
@@ -533,14 +542,22 @@ void kittie::Coupler::close()
 		}
 	}
 
-	if (mode == adios2::Mode::Write)
-	{
-		std::string fname = filename + ".done";
-		kittie::Touch(fname);
-	}
+	//if (mode == adios2::Mode::Write)
+	//{
+	//	std::string fname = filename + ".done";
+	//	kittie::Touch(fname);
+	//}
 }
+
 
 void kittie::Coupler::finalize()
 {
-
+	//for(std::map<std::string, kittie::Coupler*>::iterator it=kittie::Couplers.begin(); it!=kittie::Couplers.end(); ++it)
+	//{
+	//	if (it->second->mode == adios2::Mode::Write)
+	//	{
+	//		std::string fname = filename + ".done";
+	//		kittie::Touch(fname);
+	//	}
+	//}
 }
