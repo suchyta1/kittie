@@ -1,0 +1,19 @@
+execute_process(COMMAND ${PROJECT_SOURCE_DIR}/util/kittie-cpp.py repo ${CMAKE_CURRENT_SOURCE_DIR} --tree-output=${CMAKE_CURRENT_BINARY_DIR})
+
+include_directories(${CMAKE_BINARY_DIR}/src/Fortran)
+add_definitions(-ffree-line-length-none)
+
+add_executable(writer ${CMAKE_CURRENT_BINARY_DIR}/writer-kittie.F90)
+target_link_libraries(writer kittie_f ${libadios2} ${libfortran})
+
+add_executable(reader ${CMAKE_CURRENT_BINARY_DIR}/reader-kittie.F90)
+target_link_libraries(reader kittie_f ${libadios2} ${libfortran})
+
+install(
+	TARGETS writer 
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/Fortran
+	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+install(
+	TARGETS reader
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/Fortran
+	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

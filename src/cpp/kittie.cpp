@@ -24,6 +24,8 @@
 #endif
 
 
+
+
 bool kittie::Exists(std::string filename)
 {
 	std::ifstream ifile(filename);
@@ -47,6 +49,7 @@ void kittie::Touch(std::string filename)
 std::map<std::string, kittie::Coupler*> kittie::Couplers;
 
 
+/*
 void kittie::_buildyaml()
 {
 	const char* env_p = std::getenv("KITTIE_YAML_FILE");
@@ -54,41 +57,64 @@ void kittie::_buildyaml()
 	std::string yamlfile(env_p);
 	std::string num(env_n);
 	YAML::Node buildyaml = YAML::LoadFile(yamlfile);
-	kittie::appname = buildyaml["appname"].as<std::string>() + "-" + num;
+	//kittie::appname = buildyaml["appname"].as<std::string>() + "-" + num;
 	kittie::ngroups = buildyaml["n"].as<int>();
 	for (int i=0; i<kittie::ngroups; i++)
 	{
 		kittie::groupnames.push_back(buildyaml["groups"][i].as<std::string>());
 	}
 }
+*/
 
 
 void kittie::_groupsyaml()
 {
 	std::string name;
-	std::string yamlfile = ".kittie-groups-" + kittie::appname + ".yaml";
+	bool UseStep;
+
+	///std::string yamlfile = ".kittie-groups-" + kittie::appname + ".yaml";
+	const char* env_n = std::getenv("KITTIE_NUM");
+	std::string num(env_n);
+	std::string yamlfile = ".kittie-groups-" + num + ".yaml";
 
 	// Probably not necessary but just to be safe
+	kittie::filenames.clear();
 	kittie::setengines.clear();
 	kittie::setparams.clear();
 
 	if(Exists(yamlfile))
 	{
 		YAML::Node groupsyaml = YAML::LoadFile(yamlfile);
-		YAML::Node params;
 		std::map<std::string, std::string> param;
 
 		for(YAML::const_iterator it=groupsyaml.begin(); it!=groupsyaml.end(); ++it)
 		{
 			param.clear();
 			name = it->first.as<std::string>();
-			kittie::setengines[name] = groupsyaml[name]["engine"].as<std::string>();
-			params = groupsyaml[name]["params"];
-			for(YAML::const_iterator pit=params.begin(); pit!=params.end(); ++pit)
+
+			if (groupsyaml[name]["filename"])
 			{
-				param[pit->first.as<std::string>()] = pit->second.as<std::string>();
+				kittie::filenames[name] = groupsyaml[name]["filename"].as<std::string>();
 			}
-			kittie::setparams[name] = param;
+			if (groupsyaml[name]["engine"])
+			{
+				kittie::setengines[name] = groupsyaml[name]["engine"].as<std::string>();
+			}
+			if (YAML::Node params=groupsyaml[name]["params"])
+			{
+				for(YAML::const_iterator pit=params.begin(); pit!=params.end(); ++pit)
+				{
+					param[pit->first.as<std::string>()] = pit->second.as<std::string>();
+				}
+				kittie::setparams[name] = param;
+			}
+
+			// @effis-timestep linked groups
+			UseStep = groupsyaml[name]["AddStep"].as<bool>();
+			if (UseStep)
+			{
+				kittie::StepGroups.push_back(name);
+			}
 		}
 	}
 
@@ -99,14 +125,17 @@ void kittie::_groupsyaml()
 void kittie::_codesyaml()
 {
 	std::string name;
-	std::string yamlfile = ".kittie-codenames-" + kittie::appname + ".yaml";
+	const char* env_n = std::getenv("KITTIE_NUM");
+	std::string num(env_n);
+	std::string yamlfile = ".kittie-codenames-" + num + ".yaml";
 
 	if(Exists(yamlfile))
 	{
 		YAML::Node codesyaml = YAML::LoadFile(yamlfile);
 		YAML::Node codes = codesyaml["codes"];
 		std::string thisname;
-		kittie::myreading = reading + "-" + codesyaml["codename"].as<std::string>();
+		kittie::Codename = codesyaml["codename"].as<std::string>();
+		kittie::myreading = reading + "-" + kittie::Codename;
 		for(std::size_t i=0; i<codes.size(); i++)
 		{
 			thisname = reading + "-" + codes[i].as<std::string>();
@@ -124,9 +153,16 @@ void kittie::_codesyaml()
 
 void kittie::_yaml_setup()
 {
-	kittie::_buildyaml();
+	// @effis-timestep into all EFFIS groups -- for now this is always false, but I'll have a switch for it
+	kittie::AllStep = false;
+
+	//kittie::_buildyaml();
 	kittie::_groupsyaml();
 	kittie::_codesyaml();
+
+	// @effis-timestep
+	kittie::stepinit = false;
+	kittie::StepGroupname = kittie::Codename + "-step";
 }
 
 
@@ -136,6 +172,7 @@ void kittie::_yaml_setup()
 		kittie::adios = new adios2::ADIOS(filename, comm, DebugMode);
 		kittie::mpi = true;
 		int err = MPI_Comm_dup(comm, &kittie::comm);
+		err = MPI_Comm_rank(kittie::comm, &kittie::rank);
 		kittie::_yaml_setup();
 	}
 	
@@ -144,6 +181,7 @@ void kittie::_yaml_setup()
 		kittie::adios = new adios2::ADIOS(comm, DebugMode);
 		kittie::mpi = true;
 		int err = MPI_Comm_dup(comm, &kittie::comm);
+		err = MPI_Comm_rank(kittie::comm, &kittie::rank);
 		kittie::_yaml_setup();
 	}
 #else
@@ -153,15 +191,17 @@ void kittie::_yaml_setup()
 		kittie::adios = new adios2::ADIOS(filename, DebugMode);
 		kittie::mpi = false;
 		int err = MPI_Comm_dup(dummy, &kittie::comm);
+		err = MPI_Comm_rank(kittie::comm, &kittie::rank);
 		kittie::_yaml_setup();
 	}
 	
-	void kittie::initialize(DebugMode)
+	void kittie::initialize(const bool DebugMode)
 	{
 		MPI_Comm dummy;
 		kittie::adios = new adios2::ADIOS(DebugMode);
 		kittie::mpi = false;
 		int err = MPI_Comm_dup(dummy, &kittie::comm);
+		err = MPI_Comm_rank(kittie::comm, &kittie::rank);
 		kittie::_yaml_setup();
 	}
 #endif
@@ -174,11 +214,55 @@ void kittie::finalize()
 		if (it->second->mode == adios2::Mode::Write)
 		{
 			std::string fname = it->second->filename + ".done";
-			kittie::Touch(fname);
+			it->second->close();
+			if (kittie::rank == 0)
+			{
+				kittie::Touch(fname);
+			}
 		}
 	}
 
+	if (kittie::stepinit)
+	{
+		kittie::StepEngine.Close();
+	}
+
 	delete kittie::adios;
+}
+
+
+// @effis-timestep inserts this
+void kittie::write_step(double physical, int number)
+{
+	if (kittie::rank == 0)
+	{
+		kittie::_StepPhysical = physical;
+		kittie::_StepNumber   = number;
+
+		if (!kittie::stepinit)
+		{
+			adios2::IO io = kittie::adios->DeclareIO(kittie::StepGroupname);
+			adios2::Variable<int> VarNumber = io.DefineVariable<int>("number");
+			adios2::Variable<double> VarStep = io.DefineVariable<double>("physical");
+			io.SetEngine("SST");
+			io.SetParameter("RendezvousReaderCount", "0");
+			io.SetParameter("QueueLimit", "1");
+			io.SetParameter("QueueFullPolicy", "Discard");
+
+#			ifdef USE_MPI
+				kittie::StepEngine = io.Open(kittie::StepGroupname, adios2::Mode::Write, MPI_COMM_SELF);
+#			else
+				kittie::StepEngine = io.Open(kittie::StepGroupname, adios2::Mode::Write);
+#			endif
+
+			kittie::stepinit = true;
+		}
+
+		kittie::StepEngine.BeginStep();
+		kittie::StepEngine.Put<int>("number", &kittie::_StepNumber);
+		kittie::StepEngine.Put<double>("physical", &kittie::_StepPhysical);
+		kittie::StepEngine.EndStep();
+	}
 }
 
 
@@ -198,9 +282,32 @@ adios2::IO kittie::declare_io(const std::string groupname)
 		}
 	}
 
+	// @effis-timestep
+	kittie::Couplers[groupname]->FindStep = false;
+
 	return *(kittie::Couplers[groupname]->io);
 }
 
+
+// @effis-timestep -- Can't DefineVariables in DeclareIO b/c don't know read/write mode
+void kittie::Coupler::AddStep()
+{
+	if (!FindStep && (std::find(kittie::StepGroups.begin(), kittie::StepGroups.end(), groupname) != kittie::StepGroups.end() || kittie::AllStep))
+	{
+		FindStep = true;
+		if ((mode == adios2::Mode::Write) && (kittie::rank == 0))
+		{
+			adios2::Variable<int> VarNumber  = io->DefineVariable<int>("_StepNumber");
+			adios2::Variable<double> VarStep = io->DefineVariable<double>("_StepPhysical");
+		}
+	}
+
+	if (FindStep && (mode == adios2::Mode::Write) && (kittie::rank == 0))
+	{
+		engine.Put<int>("_StepNumber", kittie::_StepNumber);
+		engine.Put<double>("_StepPhysical", kittie::_StepPhysical);
+	}
+}
 
 
 adios2::Engine kittie::_mopen(const std::string groupname, const std::string filename, const adios2::Mode mode, MPI_Comm comm)
@@ -241,7 +348,15 @@ void kittie::Coupler::_open(MPI_Comm incomm, const std::string infilename, const
 	if (!opened)
 	{
 		// Moved this block so different files can be used per step for same group
-		filename = infilename;
+		if (kittie::filenames.find(groupname) !=  kittie::filenames.end())
+		{
+			filename = kittie::filenames[groupname];
+		}
+		else
+		{
+			filename = infilename;
+		}
+		
 		cwriting = filename + kittie::writing;
 		creading = filename + kittie::myreading;
 		allcreading.clear();
@@ -356,7 +471,13 @@ void kittie::Coupler::_CoupleOpen()
 	{
 		AcquireLock();
 	}
-	engine = io->Open(filename, mode);
+
+#	ifdef USE_MPI
+		engine = io->Open(filename, mode, comm);
+#	else
+		engine = io->Open(filename, mode);
+#	endif
+
 	if (LockFile)
 	{
 		ReleaseLock();
@@ -393,13 +514,18 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 	AcquireLock();
 	if (!opened)
 	{
-		engine = io->Open(filename, mode);
+#		ifdef USE_MPI
+			engine = io->Open(filename, mode, comm);
+#		else
+			engine = io->Open(filename, mode);
+#		endif
+
 		opened = true;
 	}
 
 	while (true)
 	{
-		status = engine.BeginStep(adios2::StepMode::NextAvailable, timeout);
+		status = engine.BeginStep(adios2::StepMode::Read, timeout);
 		if (status == adios2::StepStatus::OK)
 		{
 			current_step = current_step + 1;
@@ -451,7 +577,7 @@ adios2::StepStatus kittie::Coupler::begin_step(const double timeout)
 		//std::cerr << "If reading from file for coupling, must give what step you want to read from\n";
 		//abort();
 		
-		status = begin_step(CurrentStep + 1);
+		status = begin_step(CurrentStep+1, timeout);
 	}
 
 	init = true;
@@ -478,7 +604,7 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 			while (!found)
 			{
 				status = FileSeek(found, step, timeout);
-				if (timeout != -1)
+				if (timeout > 0)
 				{
 					break;
 				}
@@ -493,7 +619,7 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 			{
 				_CoupleOpen();
 			}
-			status = engine.BeginStep(adios2::StepMode::NextAvailable, timeout);
+			status = engine.BeginStep(adios2::StepMode::Read, timeout);
 		}
 	}
 
@@ -504,6 +630,9 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 
 void kittie::Coupler::end_step()
 {
+	// @effis-timestep added if needed
+	AddStep();
+
 	if (LockFile)
 	{
 		AcquireLock();
@@ -527,37 +656,18 @@ void kittie::Coupler::end_step()
 
 void kittie::Coupler::close()
 {
-
-	if (mode == adios2::Mode::Write)
+	if (opened) 
 	{
-		if (LockFile)
+		if ((mode == adios2::Mode::Write) && LockFile)
 		{
 			AcquireLock();
 		}
 		engine.Close();
 		opened = false;
-		if (LockFile)
+		if ((mode == adios2::Mode::Write) && LockFile)
 		{
 			ReleaseLock();
 		}
 	}
-
-	//if (mode == adios2::Mode::Write)
-	//{
-	//	std::string fname = filename + ".done";
-	//	kittie::Touch(fname);
-	//}
 }
 
-
-void kittie::Coupler::finalize()
-{
-	//for(std::map<std::string, kittie::Coupler*>::iterator it=kittie::Couplers.begin(); it!=kittie::Couplers.end(); ++it)
-	//{
-	//	if (it->second->mode == adios2::Mode::Write)
-	//	{
-	//		std::string fname = filename + ".done";
-	//		kittie::Touch(fname);
-	//	}
-	//}
-}

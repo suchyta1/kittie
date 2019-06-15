@@ -30,5 +30,7 @@ endif()
 add_subdirectory(src)
 add_subdirectory(config)
 add_subdirectory(util)
+add_subdirectory(plot)
+add_subdirectory(examples)
 
 message(STATUS "prefix: ${CMAKE_INSTALL_PREFIX}")

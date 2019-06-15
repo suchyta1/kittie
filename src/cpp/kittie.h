@@ -45,6 +45,7 @@
 				bool init;
 				bool opened;
 				bool LockFile;
+				bool FindStep;
 
 
 				// Constructors
@@ -72,13 +73,17 @@
 				void _CoupleOpen();
 				void _lockfile();
 				void begin_write();
-				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=-1.0);
+				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=0.0);
+
+				// @effis-timestep
+				void AddStep();
 		};
 
 
 		// "Private"
 		bool mpi;
 		MPI_Comm comm;
+		int rank;
 		adios2::ADIOS* adios;
 		extern std::map<std::string, Coupler*> Couplers;
 		std::vector<std::string> _FileMethods {"bpfile", "bp", "bp3", "hdf5"};
@@ -87,13 +92,28 @@
 		std::vector<std::string> allreading;
 		std::string myreading;
 
-		std::string appname;
+		//std::string appname;
+		std::string Codename;
 		int ngroups;
 		std::vector<std::string> groupnames;
 
 		int nnames;
+		std::map<std::string, std::string> filenames;
 		std::map<std::string, std::string> setengines;
 		std::map<std::string, std::map<std::string, std::string>> setparams;
+
+
+		// @effis-timestep
+		bool stepinit;
+		bool AllStep;
+		int _StepNumber;
+		double _StepPhysical;
+		std::string StepGroupname;
+		adios2::Engine StepEngine;
+		std::vector<std::string> StepGroups;
+		void write_step(double physical, int number);
+		void write_step(double physical, int number, MPI_Comm comm);
+
 
 		void _buildyaml();
 		void _groupsyaml();

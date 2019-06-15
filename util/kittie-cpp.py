@@ -11,13 +11,18 @@ import logging
 import kittie_common
 
 
-def GetVar(between, start):
+def GetVar(between, start, lang="c++"):
+    if lang == "c++":
+        extra = [';', '{', '}']
+    elif lang == "python":
+        extra = [';']
+
     ws = [' ', '\n', '\t', '\r', '\f', '\v']
     wordend = start - 1
     while between[wordend-1] in ws:
         wordend -= 1
     wordstart = wordend - 1
-    while between[wordstart-1] not in (ws + [';', '{', '}']):
+    while between[wordstart-1] not in (ws + extra):
         wordstart -= 1
     return between[wordstart:wordend]
 
@@ -97,10 +102,15 @@ def SplitOn(txt, splitkey):
 
 
 def MatchPattern(pattern, fmt, InnerText):
+    for i in range(len(fmt)):
+        for char in ['[', ']']:
+            fmt[i] = fmt[i].replace(char, '\\' + char)
+
     if len(fmt) > 0:
         Pattern = pattern.format(*fmt)
     else:
         Pattern = pattern
+
     Comp = re.compile(Pattern)
     match = Comp.search(InnerText)
     return match
@@ -117,9 +127,11 @@ class BlockFiles(object):
         self.files = []
 
         self.init = "@effis-init"
+        #self.initallowed = ["xml", "comm", "readid"]
         self.initallowed = ["xml", "comm"]
 
         self.final = "@effis-finalize"
+        self.step  = "@effis-timestep"
 
 
     def Raise(self, msg, code=None):
@@ -242,9 +254,9 @@ class BlockFiles(object):
                 val = Args[fpos]
             else:
                 val = None
-        elif self.language == "c++":
+        elif self.language in ["c++", "python"]:
             if InnerText[match.start()] == "=":
-                val = GetVar(InnerText, match.start())
+                val = GetVar(InnerText, match.start(), lang=self.language)
             elif vpos is not None:
                 val = match.group(vpos)
             else:
@@ -266,7 +278,7 @@ class BlockFiles(object):
         return engine, NewInner, UpdatePos
 
     def ForwardReplaceBegin(self, match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName'):
-        if self.language == "c++":
+        if self.language in ["c++", "python"]:
             #status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=3, remove=[0], size=2)
             status, BeginArgStr, BeginArgs = self.ArgsObj(InternalText, match, fpos=3, mpos=3)
             BeginArgStr = ', '.join(BeginArgs[1:])
@@ -286,9 +298,9 @@ class BlockFiles(object):
         UpdatePos = match.end()
         return nothing, NewInner, UpdatePos
 
-    def ForwardReplaceClose(self, match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName'):
+    def ForwardReplaceClose(self, match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName'):
         nothing, EndArgStr, EndArgs = self.ArgsObj(InternalText, match)
-        NewInner += InternalText[UpdatePos:match.start()] + self.CloseText(TmpMap[NameKey], EndArgStr, EndArgs, TmpMap['keys'])
+        NewInner += InternalText[UpdatePos:match.start()] + self.CloseText(TmpMap[NameKey], EndArgStr, EndArgs, TmpMap['keys'], engine)
         UpdatePos = match.end()
         return nothing, NewInner, UpdatePos
 
@@ -300,7 +312,7 @@ class BlockFiles(object):
         return name, NewInner, UpdatePos
 
     def ReverseReplaceOpen(self, match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName'):
-        if self.language == "c++":
+        if self.language in ["c++", "python"]:
             io, OpenArgsStr, OpenArgs = self.ArgsObj(InternalText, match, fpos=2, vpos=1, mpos=2)
         else:
             io, OpenArgsStr, OpenArgs = self.ArgsObj(InternalText, match, fpos=2, vpos=1, mpos=1)
@@ -332,7 +344,11 @@ class BlockFiles(object):
                 if match is not None:
                     engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName')
 
-                    match = MatchPattern(self.FindBeginPattern(engine), [], InternalText)
+                    TmpEngine = engine
+                    for char in ['[', ']', '(', ')']:
+                        TmpEngine = TmpEngine.replace(char, "\\" + char)
+
+                    match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
                     if match is not None:
                         status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
 
@@ -342,7 +358,7 @@ class BlockFiles(object):
 
                     match = MatchPattern(self.FindClosePattern, [engine], InternalText)
                     if match is not None:
-                        nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName')
+                        nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
 
             NewInner += InternalText[UpdatePos:]
             InternalText = NewInner
@@ -369,7 +385,11 @@ class BlockFiles(object):
             if match is not None:
                 engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='IOName')
 
-                match = MatchPattern(self.FindBeginPattern(engine), [], InternalText)
+                TmpEngine = engine
+                for char in ['[', ']', '(', ')']:
+                    TmpEngine = TmpEngine.replace(char, "\\" + char)
+
+                match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
                 if match is not None:
                     status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
 
@@ -379,7 +399,7 @@ class BlockFiles(object):
 
                 match = MatchPattern(self.FindClosePattern, [engine], InternalText)
                 if match is not None:
-                    nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='IOName')
+                    nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
 
                 # Need to go back to the to look for the DeclareIO
                 NewInner += InternalText[UpdatePos:]
@@ -412,7 +432,11 @@ class BlockFiles(object):
             UpdatePos = 0
             NewInner = ""
 
-            match = MatchPattern(self.FindBeginPattern(TmpMap['EngineObj']), [], InternalText)
+            TmpEngine = TmpMap['EngineObj']
+            for char in ['[', ']', '(', ')']:
+                TmpEngine = TmpEngine.replace(char, "\\" + char)
+
+            match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
             if match is not None:
                 status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
 
@@ -422,7 +446,7 @@ class BlockFiles(object):
 
             match = MatchPattern(self.FindClosePattern, [TmpMap['EngineObj']], InternalText)
             if match is not None:
-                nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='EngineName')
+                nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
 
             # Need to go back to the to look for the Open
             NewInner += InternalText[UpdatePos:]
@@ -451,6 +475,7 @@ class BlockFiles(object):
     def AddInit(self, InitComp, FileText):
         InitMatch = InitComp.search(FileText)
         OutText = FileText
+        found = False
 
         if InitMatch is not None:
             InnerText = FileText[InitMatch.end():]
@@ -465,7 +490,9 @@ class BlockFiles(object):
                 dictionary[key] = val
 
             OutText = FileText[:InitMatch.start()] + self.InitText(dictionary) + FileText[(InitMatch.end()+EndIndex):]
-        return OutText
+            found = True
+        return OutText, found
+
 
     def AddFinal(self, FinalComp, FileText):
         FinalMatch = FinalComp.search(FileText)
@@ -476,6 +503,18 @@ class BlockFiles(object):
             EndIndex = InnerText.find("\n")
             line = InnerText[:EndIndex].strip()
             OutText = FileText[:FinalMatch.start()] + self.FinalText() + FileText[(FinalMatch.end()+EndIndex):]
+        return OutText
+
+
+    def AddStep(self, StepComp, FileText):
+        StepMatch = StepComp.search(FileText)
+        OutText = FileText
+
+        if StepMatch is not None:
+            InnerText = FileText[StepMatch.end():]
+            EndIndex = InnerText.find("\n")
+            line = InnerText[:EndIndex].strip()
+            OutText = FileText[:StepMatch.start()] + self.StepText(line) + FileText[(StepMatch.end()+EndIndex):]
         return OutText
 
 
@@ -514,7 +553,8 @@ class BlockFiles(object):
         self.TopDir = directory
         self.files = self.GrepFor(self.begin, self.files)
         self.files = self.GrepFor(self.init,  self.files)
-        self.files = self.GrepFor(self.final,  self.files)
+        self.files = self.GrepFor(self.final, self.files)
+        self.files = self.GrepFor(self.step,  self.files)
 
 
     def MakeReplacements(self, outdir, groupnames, ignore=[], only=None, suffix="-kittie"):
@@ -522,13 +562,17 @@ class BlockFiles(object):
 
         InitExpr  = "{0}{1}".format(self.ReComment, self.init)
         FinalExpr = "{0}{1}".format(self.ReComment, self.final)
+        StepExpr  = "{0}{1}".format(self.ReComment, self.step)
         StartExpr = "{0}{1}".format(self.ReComment, self.begin)
         EndExpr   = "{0}{1}".format(self.ReComment, self.end)
-        StartComp = re.compile(StartExpr, re.MULTILINE)
-        EndComp   = re.compile(EndExpr,   re.MULTILINE)
+
         InitComp  = re.compile(InitExpr,  re.MULTILINE)
         FinalComp = re.compile(FinalExpr, re.MULTILINE)
+        StepComp  = re.compile(StepExpr,  re.MULTILINE)
+        StartComp = re.compile(StartExpr, re.MULTILINE)
+        EndComp   = re.compile(EndExpr,   re.MULTILINE)
 
+        InitFiles = []
         self.groupnames = []
         for filename in self.files:
             UpdatedPos = 0
@@ -542,10 +586,13 @@ class BlockFiles(object):
             FileText = self.AddHeader(FileText)
 
             # Look for init
-            FileText = self.AddInit(InitComp, FileText)
+            FileText, FoundInit = self.AddInit(InitComp, FileText)
 
             # Look for finalize
             FileText = self.AddFinal(FinalComp, FileText)
+
+            # Look for step
+            FileText = self.AddStep(StepComp, FileText)
 
 
             # Get the bounds of the replacement blocks
@@ -554,7 +601,7 @@ class BlockFiles(object):
 
             # I don't know what to try to do if the number of starts and ends don't match
             if len(StartMatches) != len(EndMatches):
-                self.Raise("{0}: Something isn't begun/ended properly. Found {1} {2}s and {3} {4}s".format(sef.TmpFilename, len(StartMatches), self.begin, len(EndMatches), self.end))
+                self.Raise("{0}: Something isn't begun/ended properly. Found {1} {2}s and {3} {4}s".format(self.TmpFilename, len(StartMatches), self.begin, len(EndMatches), self.end))
 
             # Find and parse all the DeclareIOs, Opens, etc. matching to any mapping defintions @effis-begin header pragma
             for i in range(len(StartMatches)):
@@ -592,8 +639,20 @@ class BlockFiles(object):
                 base, ext = os.path.splitext(self.TmpFilename)
                 outfile = "{0}{1}{2}".format(base, suffix, ext)
 
+            if FoundInit:
+                InitFiles += [outfile]
+
             with open(outfile, 'w') as out:
                 out.write(UpdatedText)
+
+        if self.language == "fortran":
+            for InitFile in InitFiles:
+                with open(InitFile, 'r') as infile:
+                    NewText = infile.read()
+                # + 1 is in case we use AddStep
+                NewText = NewText.replace("$N_KITTIE_GROUPS$", "{0}".format(len(self.groupnames) + 1))
+                with open(InitFile, 'w') as out:
+                    out.write(NewText)
 
         return groupnames + self.groupnames
 
@@ -629,6 +688,21 @@ class CppBlocks(BlockFiles):
 
     def FinalText(self):
         return "kittie::finalize();".format()
+
+    def StepText(self, line):
+        entries = SplitOn(line, ',')
+        kv = {}
+        for entry in entries:
+            key, val = SplitOn(entry, "=")
+            if key in ["number", "physical"]:
+                kv[key] = val
+            else:
+                self.Raise("Something unrecognized happened in file {0}".format(self.TmpFilename), line)
+        if 'number' not in kv:
+            self.Raise("In file {0}, 'number' is needed in {1}".format(self.TmpFilename, self.step), line)
+        if 'physical' not in kv:
+            self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
+        return "kittie::write_step({0}, {1});".format(kv['physical'], kv['number'])
 
     def DeclareText(self, args, IOName, IOobj=None):
         if IOobj is None:
@@ -677,7 +751,7 @@ class CppBlocks(BlockFiles):
         base = "kittie::Couplers[{0}]->end_step({1})".format(Name, argstr)
         return base
 
-    def CloseText(self, Name, argstr, args, keys):
+    def CloseText(self, Name, argstr, args, keys, engine):
         base = "kittie::Couplers[{0}]->close({1})".format(Name, argstr)
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
@@ -717,10 +791,26 @@ class FortranBlocks(BlockFiles):
             args += [keydict['comm']]
         if 'xml' in keydict:
             args += [keydict['xml']]
-        return "call kittie_initialize({0})".format(', '.join(args))
+        return "call kittie_initialize({0}, ngroups=$N_KITTIE_GROUPS$)".format(', '.join(args))
 
     def FinalText(self):
         return "call kittie_finalize()"
+
+    def StepText(self, line):
+        entries = SplitOn(line, ',')
+        kv = {}
+        for entry in entries:
+            key, val = SplitOn(entry, "=")
+            if key in ["number", "physical"]:
+                kv[key] = val
+            else:
+                self.Raise("Something unrecognized happened in file {0}".format(self.TmpFilename), line)
+        if 'number' not in kv:
+            self.Raise("In file {0}, 'number' is needed in {1}".format(self.TmpFilename, self.step), line)
+        if 'physical' not in kv:
+            self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
+        return "call write_step({0}, {1})".format(kv['physical'], kv['number'])
+
 
     def DeclareText(self, args, IOName, IOObj=None):
         return "{0} = KittieDeclareIO({1}, {2})".format(args[0], IOName, args[3])
@@ -738,7 +828,7 @@ class FortranBlocks(BlockFiles):
         base = self.HelperLine(IOName) + "\n" + "call kittie_open(common_helper, {0}, {1})".format(IOName, ArgsStr)
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
-            base += "\n" + "call kittie_couple_start(common_helper, {0}, {1})".format(step, args[-1])
+            base += "\n" + "call kittie_couple_start(common_helper, step={0}, ierr={1})".format(step, args[-1])
         base += "\n" + self.EngineLine(engine)
         return base
 
@@ -747,7 +837,9 @@ class FortranBlocks(BlockFiles):
         args = []
 
         if 'step' in keys:
-            args+= ["step={0}".format(keys['step'])]
+            args += ["step={0}".format(keys['step'])]
+        if len(argarr) == 5:
+            args += ["timeout={0}".format(argarr[2]), "iostatus={0}".format(argarr[3])]
         args += ["ierr={0}".format(argarr[-1])]
 
         if len(args) > 0:
@@ -763,8 +855,8 @@ class FortranBlocks(BlockFiles):
         base = self.HelperLine(Name) + "\n" + "call kittie_couple_end_step(common_helper, {0})".format(args[-1]) + "\n" + self.EngineLine(engine)
         return base
 
-    def CloseText(self, Name, argstr, args, keys):
-        base = "kittie_close(common_helper, {0})".format(args[-1])
+    def CloseText(self, Name, argstr, args, keys, engine):
+        base = "call kittie_close(common_helper, {0})".format(args[-1])
 
         if ('step' in keys) and (keys['step'].lower() == 'off'):
             step = 0
@@ -775,6 +867,106 @@ class FortranBlocks(BlockFiles):
         base += "\n" + self.EngineLine(engine)
         return base
 
+
+class PythonBlocks(BlockFiles):
+    language = "python"
+    extensions = [".py"]
+    ReComment = "#"
+    GrepComment = ReComment
+
+    HeadExpr = ["import adios2"]
+    Header   = 'import kittie'
+
+    #DeclareAdios = '\.DeclareIO'
+    FindDeclareIOPattern = "=\s*.*\.DeclareIO\s*\((\s*{0}\s*)\)"
+    FindOpenPattern = "=\s*{0}.Open\s*\((.*?)\)"
+    FindEndPattern = "{0}.EndStep\s*\((.*?)\)"
+    FindClosePattern = "{0}.Close\s*\((.*?)\)"
+
+    FindDeclareIOPatternByIO = "{0}\s*=\s*.*\.DeclareIO\s*\((.*?)\)"
+    FindOpenPatternByEngine = "{0}\s*=\s*(.*?).Open\s*\((.*?)\)"
+
+    def FindBeginPattern(self, engine):
+        return "([=;])?(\s*)" + engine + ".BeginStep\s*\((.*?)\)"
+
+    def InitText(self, keydict):
+        args = {}
+        for key in self.initallowed:
+            args[key] = None
+            if key in keydict:
+                args[key] = keydict[key]
+        return "kittie.Kittie.Initialize(xml={0}, comm={1})".format(args['xml'], args['comm'])
+
+    def FinalText(self):
+        return "kittie.Kittie.Finalize()".format()
+
+    def StepText(self, line):
+        entries = SplitOn(line, ',')
+        kv = {}
+        for entry in entries:
+            key, val = SplitOn(entry, "=")
+            if key in ["number", "physical", "comm"]:
+                kv[key] = val
+            else:
+                self.Raise("Something unrecognized happened in file {0}".format(self.TmpFilename), line)
+        if 'number' not in kv:
+            self.Raise("In file {0}, 'number' is needed in {1}".format(self.TmpFilename, self.step), line)
+        if 'physical' not in kv:
+            self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
+        return "kittie.Kittie.write_step({0}, {1})".format(kv['physical'], kv['number'])
+
+    def DeclareText(self, args, IOName, IOobj=None):
+        if IOobj is None:
+            base = "= kittie.Kittie.declare_io({0})"
+        else:
+            base = "{1} = kittie.Kittie.declare_io({0})"
+        return base.format(IOName, IOobj)
+
+    def OpenText(self, IOName, argstr, args, engine, keys, EngineObj=None):
+        if EngineObj is None:
+            base = "= kittie.Kittie.open({1}, {0})".format(argstr, IOName)
+        else:
+            base = "{1} = kittie.Kittie.open({2}, {0})".format(argstr, EngineObj, IOName)
+
+        if ('step' in keys) and (keys['step'].lower() == 'off'):
+            step = 0
+            base += ";" + "{2} = kittie.Kittie.Couplers[{0}].begin_step({1})".format(IOName, step, engine)
+        return base
+
+    def BeginText(self, Name, argstr, argarr, keys, engine, equal=True):
+        if 'step' in keys:
+            if (keys['step'].lower() == 'off'):
+                step = 0
+            else :
+                step = keys['step']
+        else:
+            step = None
+
+        if len(argstr.strip()) > 0:
+            argstr = "{0}, {1}".format(step, argstr)
+        else:
+            argstr = "{0}".format(step)
+
+        if equal:
+            base = "= kittie.Kittie.Couplers[{0}].begin_step({1}); ".format(Name, argstr)
+        else:
+            base = "kittie.Kittie.Couplers[{0}].begin_step({1}); ".format(Name, argstr)
+
+        base += "{0} = kittie.Kittie.Couplers[{1}].engine".format(engine, Name)
+
+        return base
+
+
+    def EndText(self, Name, argstr, args, engine):
+        base = "kittie.Kittie.Couplers[{0}].end_step({1})".format(Name, argstr)
+        return base
+
+    def CloseText(self, Name, argstr, args, keys, engine):
+        base = "kittie.Kittie.Couplers[{0}].close({1})".format(Name, argstr)
+        if ('step' in keys) and (keys['step'].lower() == 'off'):
+            step = 0
+            base = "kittie.Kittie.Couplers[{0}].end_step({1})".format(Name, step) + '; '+ base
+        return base
 
 def Tar(directory, outdir):
     if not os.path.exists(outdir):
@@ -791,15 +983,12 @@ if __name__ == "__main__":
 
     RepoParser = subparsers.add_parser("repo", help="Process code repository to determine its KITTIE-dependent files and group names")
     RepoParser.add_argument("directory", help="Code repository to look through for KITTIE markups")
-
-    #RepoParser.add_argument("outdir", help="Output groups namelist file")
     RepoParser.add_argument("-t", "--tree-output", help="Write replacment files into directories mimic the source directories", type=str, default=None)
-    RepoParser.add_argument("-c", "--confdir",     help="Output directory where the configuration file writes", type=str, default=None)
-
     RepoParser.add_argument("-s", "--suffix", help="String to append to file names when replaced", type=str, default="-kittie")
-    RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
     RepoParser.add_argument("-k", "--skip", help="Groups to skip", type=str, default="")
     RepoParser.add_argument("-o", "--only", help="Groups to keep", type=str, default="")
+    #RepoParser.add_argument("-c", "--confdir",     help="Output directory where the configuration file writes", type=str, default=None)
+    #RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
     RepoParser.set_defaults(which='repo')
 
     FileParser = subparsers.add_parser("file", help="Process one source file and replace KITTIE markups with appropriate APIs")
@@ -834,18 +1023,23 @@ if __name__ == "__main__":
     # Need to implement single file version
     if args.which == "repo":
 
+        """
         if args.name is None:
             args.name = os.path.basename(args.directory)
         if args.confdir is None:
             args.confdir = args.directory
+        """
 
-        Tar(args.directory, args.confdir)
+        if args.tree_output is not None:
+            Tar(args.directory, args.tree_output)
+        else:
+            Tar(args.directory, args.directory)
 
         groupnames = []
-        BlockFinders = [FortranBlocks(), CppBlocks()]
+        BlockFinders = [FortranBlocks(), CppBlocks(), PythonBlocks()]
         for finder in BlockFinders:
             finder.FindFiles(args.directory)
             groupnames = finder.MakeReplacements(args.tree_output, groupnames, ignore=args.skip, only=args.only, suffix=args.suffix)
 
-        WriteGroupsFile(groupnames, args.confdir, args.name)
+        #WriteGroupsFile(groupnames, args.confdir, args.name)
 

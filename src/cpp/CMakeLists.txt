@@ -5,6 +5,8 @@ if(USE_MPI)
 	add_definitions(-DUSE_MPI)
 	execute_process(COMMAND sed "s/#define NOTHING/#define USE_MPI/g" ${CMAKE_CURRENT_SOURCE_DIR}/kittie.h OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/kittie.h)
 	message(STATUS "OUT: ${out}")
+else()
+	execute_process(COMMAND sed "s/#define NOTHING/#define NOTHING/g" ${CMAKE_CURRENT_SOURCE_DIR}/kittie.h OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/kittie.h)
 endif()
 
 set(lib_objects ${CMAKE_CURRENT_SOURCE_DIR}/kittie.cpp)

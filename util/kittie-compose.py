@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 # Cheetah is from CODAR. It's the interface through which you use CODAR's Savanna, which composes workflows
 import codar.cheetah as cheetah
+from codar.savanna.machines import SummitNode
 
 
 # Other imports
@@ -20,6 +21,7 @@ import os
 import shutil
 import subprocess
 import sys
+import getpass
 import yaml
 
 import collections
@@ -112,8 +114,17 @@ class KittieJob(cheetah.Campaign):
         # Some things that'll be given to Cheetah
         self.cheetahdir = '.cheetah'
         self.groupname = "kittie-run"
-        #self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-{0:03d}'.format(0))
+
+        """
+        # Even older name
+        self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-{0:03d}'.format(0))
+
+        # Older dev version of name
         self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-0.0'.format(0))
+        """
+
+        # node-layout branch version of the name
+        self.cheetahsub = os.path.join(getpass.getuser(), self.groupname, 'run-0.iteration-0'.format(0))
 
 
         # Do something (possible warn or exit) if certain things aren't found
@@ -127,6 +138,7 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config, 'rundir',  'kittie-run', level=logging.WARNING)
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
 
+        self._SetIfNotFound(self.config, 'login-proc', {}, level=logging.INFO)
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job', level=logging.INFO)
         self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
 
@@ -144,9 +156,10 @@ class KittieJob(cheetah.Campaign):
         self._BlankInit(allscopes_list, self.config, [])
 
         self.codesetup = dict(self.config['run'])
-        self.codenames = self.codesetup.keys()
+        self.codenames = list(self.codesetup.keys())
         self.codescope_list = allscopes_list + ['args', 'options']
-        self.codescope_dict = allscopes_dict + ['groups']
+        #self.codescope_dict = allscopes_dict + ['groups']
+        self.codescope_dict = allscopes_dict
         for codename in self.codenames:
             self._BlankInit(self.codescope_dict, self.codesetup[codename], {})
             self._BlankInit(self.codescope_list, self.codesetup[codename], [])
@@ -376,17 +389,28 @@ class KittieJob(cheetah.Campaign):
         self.OrderedDumper.add_representer(collections.OrderedDict, dict_representer)
 
 
+    """
     def GetPlots(self):
         self.plots = {}
+
         if self.launchmode == "MPMD":
             self.plots['mpmd'] = len(self.codenames)
 
         for i, codename in enumerate(self.codenames):
             keys = self.codesetup[codename]['groups'].keys()
+
             for i, key in enumerate(keys):
                 entry = self.codesetup[codename]['groups'][key]
+                self.codesetup[codename]['groups'][key]['AddStep'] = False
+
+                label = "{0}.{1}".format(codename, entry)
+                for check in self.codenames:
+                    for sname in ['plots']:
+                        if (sname in self.codesetup[check]) and (label in self.codesetup[check][sname]):
+                            self.CodeSetup[codename]['groups'][key]['AddStep'] = True
 
                 if "plot" in entry:
+                    self.codesetup[codename]['groups'][key]['AddStep'] = True
 
                     for title in entry['plot'].keys():
                         self.plots[title] = {}
@@ -411,6 +435,7 @@ class KittieJob(cheetah.Campaign):
             outstr = yaml.dump(self.plots, default_flow_style=False, Dumper=self.OrderedDumper)
             with open(outname, 'w') as out:
                 out.write(outstr)
+    """
 
 
     def GetAppName(self, setupfile):
@@ -501,6 +526,7 @@ class KittieJob(cheetah.Campaign):
 
 
 
+        """
         self.GetPlots()
         if len(self.plots.keys()) > 0:
             self.codesetup['kittie-plotter'] = {}
@@ -510,15 +536,102 @@ class KittieJob(cheetah.Campaign):
             self._BlankInit(self.codescope_dict, self.codesetup['kittie-plotter'], {})
             self._BlankInit(self.codescope_list, self.codesetup['kittie-plotter'], [])
             self._SetIfNotFound(self.codesetup['kittie-plotter'], 'scheduler_args', value=None, level=logging.INFO)
+        """
+
+
+        for k, codename in enumerate(self.codenames):
+            self.codesetup[codename]['groups'] = {}
+            for key in self.codesetup[codename]:
+                if key.startswith('.'):
+                    name = key[1:]
+                    entry = self.codesetup[codename][key]
+                    self.codesetup[codename]['groups'][name] = self.codesetup[codename][key]
+                    self.codesetup[codename]['groups'][name]['AddStep'] = False
+
+        # See if we're linking anything from other groups
+        for k, codename in enumerate(self.codenames):
+            for key in self.codesetup[codename]['groups']:
+                entry = self.codesetup[codename]['groups'][key]
+
+                if 'plots' in entry:
+                    if 'reads' not in entry:
+                        entry['reads'] = entry['plots']
+                    else:
+                        entry['reads'] += entry['plots']
+
+                if 'reads' in entry:
+                    code, group = entry['reads'].split('.', 1)
+                    other = self.codesetup[code]['groups'][group]
+
+                    if 'filename' not in other:
+                        raise ValueError("If you're going to read {0}.{1} you need to set it's filename when it writes".format(code, group))
+
+                    if self.launchmode != "MPMD":
+                        self.codesetup[codename]['groups'][key]['stepfile'] = os.path.join(self.mainpath, code, code + '-step')
+
+                    self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
+                    if 'engine' in other:
+                        self.codesetup[codename]['groups'][key]['engine'] = self.codesetup[code]['groups'][group]['engine']
+
+                    self.codesetup[code]['groups'][group]['AddStep'] = True
+                    #self.codesetup[codename]['groups'][key]['FromApp'] = code +
+
+        self.stepinfo = {}
+        lname = self.keywords['login-proc']
+        uselogin = False
+        if ('use' in self.config[lname]) and self.config[lname]['use']:
+            uselogin = True
+            self.codenames += [lname]
+            self.codesetup[lname] = {}
+            self.codesetup[lname]['args'] = []
+            self.codesetup[lname]['scheduler_args'] = None
+            self.codesetup[lname]['options'] = {}
+            self.codesetup[lname]['path'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "plot", "login.py")
+            self.codesetup[lname]['processes'] = 1
+            self.codesetup[lname]['processes-per-node'] = 1
+            self.codesetup[lname][self.keywords['copy']] = []
+            self.codesetup[lname][self.keywords['copycontents']] = []
+            self.codesetup[lname][self.keywords['link']] = []
+            self.codesetup[lname][self.keywords['file-edit']] = {}
+            self.codesetup[lname]['groups'] = {}
+
+            self.stepinfo['login'] = {}
+            for name in ['shot_name', 'run_name', 'http']:
+                if name not in self.config[lname]:
+                    msg = "{0} is required with {1} on. Exiting".format(msg, lname)
+                    self.logger.error(msg)
+                    sys.exit(1)
+                self.stepinfo['login'][name] = self.config[lname][name]
+
+            self.stepinfo['login']['username'] = getpass.getuser()
+            self.stepinfo['login']['date'] = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S+%f')
+            self.stepinfo['login']['machine_name'] = self.config['machine']['name']
+
+            for k, codename in enumerate(self.codenames):
+                for j, groupname in enumerate(self.codesetup[codename]['groups']):
+                    if 'plots' in self.codesetup[codename]['groups'][groupname]:
+                        cname, gname = self.codesetup[codename]['groups'][groupname]['plots'].split('.', 1)
+                        name = "{0}-{1}-StepsDone.bp".format(codename, gname)
+                        if self.launchmode != "MPMD":
+                            name = os.path.join(self.mainpath, codename, name)
+                        else:
+                            name = os.path.join(self.mainpath, name)
+                        self.stepinfo['{0}.{1}'.format(cname, gname)] = name
 
 
         for k, codename in enumerate(self.codenames):
 
             codedict = {}
             codedict['exe'] = self.codesetup[codename]['path']
-            self.codes.append((codename, codedict))
+            
+            # Added in node-layout branch
+            if codename == lname:
+                codedict['runner_override'] = True
 
+            self.codes.append((codename, codedict))
             self.codesetup[codename]['setup-file'] = os.path.join(os.path.dirname(self.codesetup[codename]['path']), ".kittie-setup.nml")
+
+            """
             if codename != "kittie-plotter":
                 if not os.path.exists(self.codesetup[codename]['setup-file']):
                     if 'appname' not in self.codesetup[codename]:
@@ -527,36 +640,52 @@ class KittieJob(cheetah.Campaign):
                     self.codesetup[codename]['appname'] = "{0}-{1}".format(self.GetAppName(self.codesetup[codename]['setup-file']), k)
             else:
                 self.codesetup[codename]['appname'] = "kittie-plotter-{0}".format(k)
+            """
 
 
             # Set the number of processes
-            sweeparg = cheetah.parameters.ParamRunner(codename, "nprocs", [self.codesetup[codename]['processes']])
-            self.node_layout[self.machine].append({codename: self.codesetup[codename]['processes-per-node']})
-            sweepargs.append(sweeparg)
+            sweepargs += [cheetah.parameters.ParamRunner(codename, "nprocs", [self.codesetup[codename]['processes']])]
+
+
+            # Set the node layout -- namely, it's different on summit
+            if self.machine == 'summit':
+                self.node_layout[self.machine] += [SummitNode()]
+                for i in range(self.codesetup[codename]['processes-per-node']):
+                    self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
+            else:
+                self.node_layout[self.machine] += [{codename: self.codesetup[codename]['processes-per-node']}]
+
 
             # Set the command line arguments
             args = self.codesetup[codename]['args']
             for i, arg in enumerate(args):
-                sweeparg = cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])
-                sweepargs.append(sweeparg)
+                sweepargs += [cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])]
 
+            # Set the command line options
             options = self.codesetup[codename]['options']
             for i, option in enumerate(options):
-                sweepopt = cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option[0]), [option[1]])
-                sweepargs.append(sweepopt)
+                sweepargs += [cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option[0]), [option[1]])]
+
 
             if self.config['machine'][self.keywords['scheduler_args']] is not None:
-                schedarg = cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.config['machine'][self.keywords['scheduler_args']])])
-                sweepargs.append(schedarg)
+                sweepargs += [cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.config['machine'][self.keywords['scheduler_args']])])]
+
             if self.codesetup[codename][self.keywords['scheduler_args']] is not None:
-                schedarg = cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.codesetup[codename][self.keywords['scheduler_args']])])
-                sweepargs.append(schedarg)
+                sweepargs += [cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.codesetup[codename][self.keywords['scheduler_args']])])]
+
 
             exedir = os.path.dirname(self.codesetup[codename]['path'])
             sweepenv1 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-yaml', 'KITTIE_YAML_FILE', [os.path.join(exedir, ".kittie-setup.yaml")])
             sweepenv2 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-nml',  'KITTIE_NML_FILE',  [os.path.join(exedir, ".kittie-setup.nml" )])
             sweepenv3 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-num',  'KITTIE_NUM', ['{0}'.format(k)])
             sweepargs += [sweepenv1, sweepenv2, sweepenv3]
+
+
+        if uselogin and ('env' in self.config[lname]):
+            for varname in self.config[lname]['env'].keys():
+                sweepenv = cheetah.parameters.ParamEnvVar(lname, lname + "-" + varname, varname, [self.config[lname]['env'][varname]])
+                sweepargs += [sweepenv]
+
 
         # A sweep encompasses is a set of parameters that can vary. In my case nothing is varying, and the only sweep paramter is a single number of processes
         sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
@@ -646,7 +775,7 @@ class KittieJob(cheetah.Campaign):
 
 
     def WriteGroupsFile(self):
-        for i, codename in enumerate(self.codenames):
+        for k, codename in enumerate(self.codenames):
             if codename == "kittie-plotter":
                 continue
 
@@ -661,6 +790,13 @@ class KittieJob(cheetah.Campaign):
                 entry = self.codesetup[codename]['groups'][key]
                 gstr = "names({0}) = '{1}'".format(i+1, key)
                 nparams = 0
+
+                if entry['AddStep']:
+                    gstr = "{0}{1}kittie_addstep({2}) = T".format(gstr, '\n', i+1)
+
+                if 'filename' in entry:
+                    gstr = "{0}{1}kittie_filenames({2}) = '{3}'".format(gstr, '\n', i+1, entry['filename'])
+
 
                 if "engine" in entry:
                     engine = entry["engine"]
@@ -697,7 +833,8 @@ class KittieJob(cheetah.Campaign):
             plots_list = ["plots_list", '\n'.join(pstrs)]
             params_list = ["params_list", '\n'.join(params+values)]
             outstr = kittie_common.Namelist(names, names_list, plots_list, params_list)
-            kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
+            #kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
+            kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=k, launchmode=self.launchmode)
 
             if self.launchmode == "default":
                 outdir = os.path.join(self.mainpath, codename)
@@ -705,7 +842,8 @@ class KittieJob(cheetah.Campaign):
                 outdir = self.mainpath
             #outstr = yaml.dump(dict(self.codesetup[codename]["groups"]), default_flow_style=False)
             outstr = yaml.dump(self.codesetup[codename]["groups"], default_flow_style=False, Dumper=self.OrderedDumper)
-            outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(self.codesetup[codename]['appname']))
+            #outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(self.codesetup[codename]['appname']))
+            outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(k))
             with open(outname, "w") as outfile:
                 outfile.write(outstr)
 
@@ -716,23 +854,36 @@ class KittieJob(cheetah.Campaign):
             gstrs.append("codenames({0}) = '{1}'".format(i+1, code))
         gstrs = '\n'.join(gstrs)
 
-        for codename in self.codenames:
+        for i, codename in enumerate(self.codenames):
             if codename == "kittie-plotter":
                 continue
             nstrs = "ncodes = {0}{1}codename = '{2}'".format(len(self.codenames), '\n', codename)
             nlist = ["codes", nstrs]
             glist = ["codes_list", gstrs]
             outstr = kittie_common.Namelist(nlist, glist)
-            kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
+            #kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
+            kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=i, launchmode=self.launchmode)
 
             if self.launchmode == "default":
                 outdir = os.path.join(self.mainpath, codename)
             else:
                 outdir = self.mainpath
-            outdict = {'n': len(self.codenames), 'codename': codename, 'codes': list(self.codenames)}
+            outdict = {'n': len(self.codenames), 'codename': str(codename), 'codes': list(self.codenames)}
             outstr = yaml.dump(outdict, default_flow_style=False)
-            outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(self.codesetup[codename]['appname']))
+            #outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(self.codesetup[codename]['appname']))
+            outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(i))
             with open(outname, 'w') as outfile:
+                outfile.write(outstr)
+
+
+    def WriteStepsFile(self):
+        if self.stepinfo != {}:
+            if self.launchmode != "MPMD":
+                outname = os.path.join(self.mainpath, self.keywords['login-proc'], "step-info.yaml")
+            else:
+                outname = os.path.join(self.mainpath, "step-info.yaml")
+            outstr = yaml.dump(self.stepinfo, default_flow_style=False)
+            with open(outname, "w") as outfile:
                 outfile.write(outstr)
 
 
@@ -779,7 +930,10 @@ class KittieJob(cheetah.Campaign):
 
         self.WriteCodesFile()
         self.WriteGroupsFile()
+        self.WriteStepsFile()
+        """
         self.WritePlotsFile()
+        """
 
         self.FromScript()
         self.CopyInput(YamlFile)

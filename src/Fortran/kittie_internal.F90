@@ -93,6 +93,14 @@ module kittie_internal
 				ssize = 1
 				ierr = 0
 			end subroutine mpi_comm_size
+
+			subroutine mpi_comm_dup(oldcom, newcomm, ierr)
+				integer, intent(in) :: oldcom
+				integer, intent(out) :: newcomm
+				integer, intent(out) :: ierr
+				newcomm = -1
+				ierr = 0
+			end subroutine mpi_comm_dup
 #		endif
 
 
