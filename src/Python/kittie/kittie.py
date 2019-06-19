@@ -149,7 +149,7 @@ class Coupler(object):
             if not os.path.exists(self.filename + ".done"):
                 status = adios2.StepStatus.NotReady
 
-        return status
+        return status, found
 
 
     def begin_step(self, step=None, timeout=0.0):
@@ -169,7 +169,7 @@ class Coupler(object):
 
             if self.lockfile:
                 while not found:
-                    status = self.FileSeek(found, usestep, timeout)
+                    status, found = self.FileSeek(found, usestep, timeout)
                     if (timeout > 0):
                         break
             else:
@@ -369,13 +369,11 @@ class Kittie(object):
 
     @classmethod
     def open(cls, groupname, filename, mode, comm=None):
-        """
         if comm is not None:
             cls.Couplers[groupname].open(filename, mode, comm=comm)
         else:
-            cls.Couplers[gropuname].open(filename, mode, comm=cls.comm)
-        """
-        cls.Couplers[groupname].open(filename, mode, comm=comm)
+            cls.Couplers[groupname].open(filename, mode, comm=cls.comm)
+        #cls.Couplers[groupname].open(filename, mode, comm=comm)
 
         return cls.Couplers[groupname].engine
 

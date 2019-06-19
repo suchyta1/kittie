@@ -809,6 +809,7 @@ module kittie
 				do i=1, nnames
 					if (trim(helper%groupname) == trim(names(i)) .and. (kittie_filenames(i) /= "") ) then
 						helper%filename = string_copy(trim(kittie_filenames(i)))
+						exit
 					else
 						helper%filename = string_copy(trim(filename))
 					end if

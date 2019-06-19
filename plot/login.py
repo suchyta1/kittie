@@ -47,6 +47,27 @@ def IndexJSON(config, indent=4):
     return timefile, timedict
 
 
+"""
+def IndexJSON(config, rundir, timefile, indexfile, indent=4):
+    if not os.path.exists(rundir):
+        os.makedirs(rundir)
+        timestr = json.dumps(timedict, indent=indent)
+        with open(timefile, 'w') as outfile:
+            outfile.write(timestr)
+
+    if os.path.exists(indexfile):
+        with open(indexfile, mode='rb+') as infile:
+            infile.seek(0,  2)
+            infile.seek(-2, 1)
+            infile.write(','.encode('utf-8'))
+            outstr = outstr[1:-1] + '\n]'
+            infile.write(outstr.encode('utf-8'))
+    else:
+        with open(indexfile, mode='w') as outfile:
+            outfile.write(outstr)
+"""
+
+
 if __name__ == "__main__":
 
     indent = 4
@@ -56,6 +77,22 @@ if __name__ == "__main__":
 
     timefile, timedict = IndexJSON(config, indent=indent)
     del config['login']
+
+    """
+    outdict = {}
+    login = config['login']
+    del config['login']
+    for name in ['shot_name', 'run_name', 'username', 'machine_name', 'date']:
+        outdict[name] = login[name]
+    outstr = json.dumps([outdict], indent=indent)
+
+    httpdir = login['http']
+    indexfile = os.path.join(httpdir, 'index.json')
+    rundir = os.path.join(httpdir, login['shot_name'], login['run_name'])
+    timefile = os.path.join(rundir, "time.json")
+    timedict = {"current": 0, "complete": False}
+    IndexWritten = False
+    """
 
 
     #@effis-init comm=None
@@ -97,10 +134,12 @@ if __name__ == "__main__":
             if ReadStatus == adios2.StepStatus.NotReady:
                 continue
             elif ReadStatus != adios2.StepStatus.OK:
+                print("Found last in ", name); sys.stdout.flush()
                 setup[name]['done'] = True
                 setup['done'] += 1
                 continue
 
+            print("Getting step from ", name); sys.stdout.flush()
             varid = setup[name]['io'].InquireVariable("Step")
             setup[name]['engine'].Get(varid, setup[name]['LastStep'])
             setup[name]['engine'].EndStep()
@@ -115,9 +154,18 @@ if __name__ == "__main__":
                 minfound = setup[name]['LastStep'][0]
             check += 1
 
+
         if check == setup['size']:
+
+            """
+            if not IndexWritten:
+                timedict = {"current": setup['LastStep']+1, "complete": False}
+                timefile, timedict = IndexJSON(config, rundir, timefile, indexfile, indent=indent)
+                IndexWritten = True
+            """
+
             for i in range(setup['LastStep']+1, minfound+1):
-                print("Done: ", i)
+                print("Done: ", i); sys.stdout.flush()
 
                 vardict = []
                 vardir = os.path.join(os.path.dirname(timefile), "{0}".format(i))
@@ -127,24 +175,34 @@ if __name__ == "__main__":
                 
                 tarargs = []
                 allfiles = []
+                allgroups = []
                 for name in config.keys():
                     topdir = os.path.dirname(config[name])
-                    subdir = os.path.join(topdir, "images", "{0}-{1}".format(name, i))
+                    #subdir = os.path.join(topdir, "images", "{0}-{1}".format(name, i))
+                    middir = os.path.join(topdir, "images", str(i))
+                    subdir = os.path.join(middir, name)
                     if os.path.exists(subdir):
                         files = os.listdir(subdir)
-                        tarargs += ["-C", subdir] + files
+                        #tarargs += ["-C", subdir] + files
+                        tarargs += ["-C", middir, name]
                         allfiles += files
+                        for j in range(len(files)):
+                            allgroups += [name]
 
-                for filename in allfiles:
+                for filename, groupname in zip(allfiles, allgroups):
                     fname = os.path.basename(filename)
                     name, ext = os.path.splitext(fname)
                     # I should make this a double underscore or something
                     yname, xname = name.split('_vs_')
-                    vardict += [{'variable_name': yname, 'image_name': filename}]
+                    vardict += [{'variable_name': yname, 'image_name': filename, 'group_name': groupname}]
 
+                tarfile = os.path.join(vardir, "images.tar.gz".format(i))
                 if len(tarargs) > 0:
-                    tarfile = os.path.join(vardir, "step-{0}.tar".format(i))
-                    subprocess.call(['tar', '-cf', tarfile] + tarargs)
+                    subprocess.call(['tar', 'cfz', tarfile] + tarargs)
+                else:
+                    if not os.path.exists("images"):
+                        os.makedirs("images")
+                    subprocess.call(['tar', 'cfz', tarfile, "images/"])
 
                 timedict['current'] = i
                 timedict['complete'] = True

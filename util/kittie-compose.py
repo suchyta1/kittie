@@ -103,7 +103,7 @@ class KittieJob(cheetah.Campaign):
 
         for name in names:
             if name not in dictionary.keys():
-                dictionary[name] = value
+                dictionary[name] = copy.copy(value)
 
 
     def _DefaultArgs(self):
@@ -157,9 +157,10 @@ class KittieJob(cheetah.Campaign):
 
         self.codesetup = dict(self.config['run'])
         self.codenames = list(self.codesetup.keys())
-        self.codescope_list = allscopes_list + ['args', 'options']
+        self.codescope_list = allscopes_list + ['args']
+        #self.codescope_list = allscopes_list + ['args', 'options']
         #self.codescope_dict = allscopes_dict + ['groups']
-        self.codescope_dict = allscopes_dict
+        self.codescope_dict = allscopes_dict + ['options']
         for codename in self.codenames:
             self._BlankInit(self.codescope_dict, self.codesetup[codename], {})
             self._BlankInit(self.codescope_list, self.codesetup[codename], [])
@@ -559,17 +560,24 @@ class KittieJob(cheetah.Campaign):
                     else:
                         entry['reads'] += entry['plots']
 
+                    thisdir = os.path.dirname(os.path.realpath(__file__))
+                    mfile = os.path.join(os.path.dirname(thisdir), "plot", "matplotlibrc")
+                    if mfile not in self.codesetup[codename][self.keywords['copy']]:
+                        self.codesetup[codename][self.keywords['copy']] += [mfile]
+
                 if 'reads' in entry:
                     code, group = entry['reads'].split('.', 1)
                     other = self.codesetup[code]['groups'][group]
 
-                    if 'filename' not in other:
+                    if ('filename' not in other) and (('fromcode' not in other) or (not other['fromcode'])):
                         raise ValueError("If you're going to read {0}.{1} you need to set it's filename when it writes".format(code, group))
+                    elif 'filename' in other:
+                        self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
 
                     if self.launchmode != "MPMD":
                         self.codesetup[codename]['groups'][key]['stepfile'] = os.path.join(self.mainpath, code, code + '-step')
 
-                    self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
+                    #self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
                     if 'engine' in other:
                         self.codesetup[codename]['groups'][key]['engine'] = self.codesetup[code]['groups'][group]['engine']
 
@@ -662,9 +670,9 @@ class KittieJob(cheetah.Campaign):
                 sweepargs += [cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])]
 
             # Set the command line options
-            options = self.codesetup[codename]['options']
-            for i, option in enumerate(options):
-                sweepargs += [cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option[0]), [option[1]])]
+            options = dict(self.codesetup[codename]['options'])
+            for i, option in enumerate(options.keys()):
+                sweepargs += [cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option), [options[option]])]
 
 
             if self.config['machine'][self.keywords['scheduler_args']] is not None:
@@ -938,8 +946,6 @@ class KittieJob(cheetah.Campaign):
         self.FromScript()
         self.CopyInput(YamlFile)
         self.MoveLog()
-
-
 
 
 if __name__ == "__main__":
