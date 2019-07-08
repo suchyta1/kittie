@@ -6,14 +6,14 @@ lines.linestyle     : -
 lines.color         : black
  
 #fonts & text
-font.family         : cmr10
-font.sans-serif     : Arial
+font.family         : stixgeneral
+#font.sans-serif     : Arial
 font.weight         : normal
 font.size           : 12.0
 text.color          : black
 
 
-#text.usetex         : True
+text.usetex         : False
 #text.latex.preamble : \usepackage{txfonts}
 
  
@@ -33,6 +33,7 @@ grid.color          : black
 grid.alpha          : 0.2
 grid.linestyle      : -
 grid.linewidth      : 0.5
+axes.titlepad       : 30
  
 xtick.major.size     : 7
 xtick.minor.size     : 4

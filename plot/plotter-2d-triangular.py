@@ -51,7 +51,7 @@ def Plot(data, nodesname, triname, outdir, fs=20, xname="x", yname="y", cmap="bw
 
         ax.set_xlabel(xname, fontsize=fs)
         ax.set_ylabel(yname, fontsize=fs)
-        ax.set_title("time = {0:.3e}".format(data['_StepPhysical'][0]),  fontsize=fs)
+        ax.set_title("{1},  time = {0:.1e}".format(data['_StepPhysical'][0], name),  fontsize=fs)
 
         fig.savefig(os.path.join(outdir, "{0}_vs_{2}_{3}-{1}.svg".format(name, data['_StepNumber'][0], xname, yname)), bbox_inches="tight")
         plt.close(fig)
