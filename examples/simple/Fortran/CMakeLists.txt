@@ -4,10 +4,12 @@ include_directories(${CMAKE_BINARY_DIR}/src/Fortran)
 add_definitions(-ffree-line-length-none)
 
 add_executable(writer ${CMAKE_CURRENT_BINARY_DIR}/writer-kittie.F90)
-target_link_libraries(writer kittie_f ${libadios2} ${libfortran})
+#target_link_libraries(writer kittie_f ${libadios2} ${libfortran})
+target_link_libraries(writer kittie_f adios2::adios2_f)
 
 add_executable(reader ${CMAKE_CURRENT_BINARY_DIR}/reader-kittie.F90)
-target_link_libraries(reader kittie_f ${libadios2} ${libfortran})
+#target_link_libraries(reader kittie_f ${libadios2} ${libfortran})
+target_link_libraries(reader kittie_f adios2::adios2_f)
 
 install(
 	TARGETS writer 
