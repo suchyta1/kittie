@@ -489,7 +489,11 @@ module kittie
 
 
 			do while (.true.)
-				call adios2_begin_step(helper%engine, adios2_step_mode_read, timeout, iostatus, ierr)
+#				ifdef ADIOS2_OLD_STEP
+					call adios2_begin_step(helper%engine, adios2_step_mode_next_available, timeout, iostatus, ierr)
+#				else
+					call adios2_begin_step(helper%engine, adios2_step_mode_read, timeout, iostatus, ierr)
+#				endif
 
 				if (iostatus == 0) then
 					current_step = current_step + 1
@@ -894,7 +898,11 @@ module kittie
 						helper%begintime_a(1) = mpi_wtime()
 #					endif
 
-					call adios2_begin_step(helper%engine, adios2_step_mode_read, ftimeout, fstatus, iierr)
+#					ifdef ADIOS2_OLD_STEP
+						call adios2_begin_step(helper%engine, adios2_step_mode_next_available, ftimeout, fstatus, iierr)
+#					else
+						call adios2_begin_step(helper%engine, adios2_step_mode_read, ftimeout, fstatus, iierr)
+#					endif
 
 #					ifdef FINE_TIME
 						helper%begintime_a(1) = mpi_wtime() - helper%begintime_a(1)

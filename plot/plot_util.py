@@ -233,7 +233,7 @@ class KittiePlotter(object):
     def _CheckStepFile(self):
         NewStep = False
         if not self.SteppingDone:
-            StepStatus = self.StepEngine.BeginStep(adios2.StepMode.Read, 0.1)
+            StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.1)
             if StepStatus == adios2.StepStatus.EndOfStream:
                 self.SteppingDone = True
             elif StepStatus == adios2.StepStatus.OK:
@@ -259,7 +259,7 @@ class KittiePlotter(object):
 
         #self.ReadComm.Barrier()
         #@effis-begin self.engine--->"plotter"
-        ReadStatus = self.engine.BeginStep(adios2.StepMode.Read, 1.0)
+        ReadStatus = self.engine.BeginStep(kittie.Kittie.ReadStepMode, 1.0)
         #@effis-end
 
         self.DoPlot = True

@@ -127,7 +127,8 @@ class Coupler(object):
             self.opened = True
 
         while True:
-            status = self.engine.BeginStep(adios2.StepMode.Read, timeout)
+            status = self.engine.BeginStep(Kittie.ReadStepMode, timeout)
+
             if status == adios2.StepStatus.OK:
                 CurrentStep += 1
             else:
@@ -175,7 +176,8 @@ class Coupler(object):
             else:
                 if not self.opened:
                     self.CoupleOpen()
-                status = self.engine.BeginStep(adios2.StepMode.Read, timeout)
+
+                status = self.engine.BeginStep(Kittie.ReadStepMode, timeout)
 
         self.BegunStepping = True
         return status
@@ -223,6 +225,7 @@ class Kittie(object):
     writing = ".writing"
     reading = ".reading"
     touch = False
+    OldStep = False
     #appname = None
     Codename = None
 
@@ -237,6 +240,11 @@ class Kittie(object):
     StepGroups = []
     AllReading = []
     Couplers = {}
+
+    if OldStep:
+        ReadStepMode = adios2.StepMode.NextAvailable
+    else:
+        ReadStepMode = adios2.StepMode.Read
 
 
     #######################

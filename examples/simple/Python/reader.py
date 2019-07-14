@@ -38,7 +38,7 @@ if __name__ == "__main__":
     #@effis-begin reader--->"Jaberwocky"
     while True:
 
-        status = reader.BeginStep(adios2.StepMode.Read, 10.0)
+        status = reader.BeginStep(kittie.Kittie.ReadStepMode, 10.0)
 
         if status == adios2.StepStatus.NotReady:
             time.sleep(1)

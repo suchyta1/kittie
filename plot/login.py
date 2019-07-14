@@ -129,7 +129,7 @@ if __name__ == "__main__":
                 setup[name]['engine'] = setup[name]['io'].Open(config[name], adios2.Mode.Read)
                 setup[name]['opened'] = True
 
-            ReadStatus = setup[name]['engine'].BeginStep(adios2.StepMode.Read, 0.1)
+            ReadStatus = setup[name]['engine'].BeginStep(kittie.Kittie.ReadStepMode, 0.1)
 
             if ReadStatus == adios2.StepStatus.NotReady:
                 continue

@@ -525,7 +525,13 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 
 	while (true)
 	{
-		status = engine.BeginStep(adios2::StepMode::Read, timeout);
+#		if ADIOS2_VERSION_MAJOR > 2 || (ADIOS2_VERSION_MAJOR == 2 && ADIOS2_VERSION_MINOR > 3)
+			status = engine.BeginStep(adios2::StepMode::Read, timeout);
+#		else
+			status = engine.BeginStep(adios2::StepMode::NextAvailable, timeout);
+#		endif
+
+
 		if (status == adios2::StepStatus::OK)
 		{
 			current_step = current_step + 1;
@@ -619,7 +625,11 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 			{
 				_CoupleOpen();
 			}
-			status = engine.BeginStep(adios2::StepMode::Read, timeout);
+#			if ADIOS2_VERSION_MAJOR > 2 || (ADIOS2_VERSION_MAJOR == 2 && ADIOS2_VERSION_MINOR > 3)
+				status = engine.BeginStep(adios2::StepMode::Read, timeout);
+#			else
+				status = engine.BeginStep(adios2::StepMode::NextAvailable, timeout);
+#			endif
 		}
 	}
 

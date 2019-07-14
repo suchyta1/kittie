@@ -2,6 +2,9 @@
 add_definitions(-ffree-line-length-none)
 
 if(USE_MPI)
+	if(ADIOS2_VERSION LESS 2.4.0)
+		add_definitions(-DADIOS2_OLD_STEP)
+	endif()
 	add_definitions(-DUSE_MPI)
 endif()
 
