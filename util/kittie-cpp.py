@@ -502,7 +502,16 @@ class BlockFiles(object):
             InnerText = FileText[FinalMatch.end():]
             EndIndex = InnerText.find("\n")
             line = InnerText[:EndIndex].strip()
-            OutText = FileText[:FinalMatch.start()] + self.FinalText() + FileText[(FinalMatch.end()+EndIndex):]
+
+            closedstr = "closed\s*="
+            pattern = re.compile(closedstr)
+            match = pattern.search(line)
+            if match is not None:
+                closed = line[match.end():].strip()
+            else:
+                closed = None
+
+            OutText = FileText[:FinalMatch.start()] + self.FinalText(closed=closed) + FileText[(FinalMatch.end()+EndIndex):]
         return OutText
 
 
@@ -686,7 +695,7 @@ class CppBlocks(BlockFiles):
         args += ['adios2::DebugON']
         return "kittie::initialize({0});".format(', '.join(args))
 
-    def FinalText(self):
+    def FinalText(self, closed=None):
         return "kittie::finalize();".format()
 
     def StepText(self, line):
@@ -793,8 +802,11 @@ class FortranBlocks(BlockFiles):
             args += [keydict['xml']]
         return "call kittie_initialize({0}, ngroups=$N_KITTIE_GROUPS$)".format(', '.join(args))
 
-    def FinalText(self):
-        return "call kittie_finalize()"
+    def FinalText(self, closed=None):
+        if closed is not None:
+            return "call kittie_finalize(closed={0})".format(closed)
+        else:
+            return "call kittie_finalize()"
 
     def StepText(self, line):
         entries = SplitOn(line, ',')
@@ -897,7 +909,7 @@ class PythonBlocks(BlockFiles):
                 args[key] = keydict[key]
         return "kittie.Kittie.Initialize(xml={0}, comm={1})".format(args['xml'], args['comm'])
 
-    def FinalText(self):
+    def FinalText(self, closed=None):
         return "kittie.Kittie.Finalize()".format()
 
     def StepText(self, line):

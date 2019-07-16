@@ -560,12 +560,23 @@ module kittie
 		end subroutine kittie_couple_open
 
 
-		subroutine kittie_finalize(iierr)
+		subroutine kittie_finalize(iierr, closed)
 			integer, intent(out), optional :: iierr
-			integer :: i, rank, ierr
+			character(len=*), dimension(:), intent(in), optional :: closed
+			integer :: i, j, rank, ierr
 
 			do i=1, size(helpers)
-				call kittie_close(helpers(i), ierr)
+				if (.not.present(closed)) then
+					call kittie_close(helpers(i), ierr)
+				else
+					do j=1, size(closed)
+						if (trim(helpers(i)%groupname) == trim(closed(i))) then
+							call kittie_close(helpers(i), ierr)
+							exit
+						end if
+					end do
+				end if
+
 				if ((helpers(i)%rank == 0) .and. (helpers(i)%mode == adios2_mode_write)) then
 					call touch_file(trim(helpers(i)%filename)//'.done')
 				end if
