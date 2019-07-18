@@ -8,6 +8,7 @@ import re
 import subprocess
 import yaml
 import logging
+import sys
 import kittie_common
 
 
@@ -334,34 +335,45 @@ class BlockFiles(object):
             if (only is not None) and (TmpMap['NewName'] not in only):
                 continue
 
-            UpdatePos = 0
-            NewInner = ""
+            engine = None
+            itcount = 0
+            while True:
+                NewInner = ""
+                UpdatePos = 0
 
-            match = MatchPattern(self.FindDeclareIOPattern, [TmpMap['OldName']], InternalText)
-            if match is not None:
-                io, NewInner, UpdatePos = self.ForwardReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePos)
-                match = MatchPattern(self.FindOpenPattern, [io], InternalText)
-                if match is not None:
-                    engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName')
-
-                    TmpEngine = engine
-                    for char in ['[', ']', '(', ')']:
-                        TmpEngine = TmpEngine.replace(char, "\\" + char)
-
-                    match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
+                match = MatchPattern(self.FindDeclareIOPattern, [TmpMap['OldName']], InternalText)
+                if (match is not None) or (itcount > 0):
                     if match is not None:
-                        status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+                        io, NewInner, UpdatePos = self.ForwardReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePos)
 
-                    match = MatchPattern(self.FindEndPattern, [engine], InternalText)
-                    if match is not None:
-                        nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+                    match = MatchPattern(self.FindOpenPattern, [io], InternalText)
+                    if (match is not None) or (itcount > 0):
+                        if match is not None:
+                            engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='NewName')
 
-                    match = MatchPattern(self.FindClosePattern, [engine], InternalText)
-                    if match is not None:
-                        nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+                        if engine is not None:
+                            TmpEngine = engine
+                            for char in ['[', ']', '(', ')']:
+                                TmpEngine = TmpEngine.replace(char, "\\" + char)
 
-            NewInner += InternalText[UpdatePos:]
-            InternalText = NewInner
+                            match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
+                            if match is not None:
+                                status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+
+                            match = MatchPattern(self.FindEndPattern, [engine], InternalText)
+                            if match is not None:
+                                nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+
+                            match = MatchPattern(self.FindClosePattern, [engine], InternalText)
+                            if match is not None:
+                                nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='NewName')
+
+                    InternalText = NewInner + InternalText[UpdatePos:]
+                    itcount += 1
+
+                if UpdatePos == 0:
+                    break
+
         return InternalText
 
 
