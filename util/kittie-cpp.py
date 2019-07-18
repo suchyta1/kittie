@@ -394,6 +394,7 @@ class BlockFiles(object):
             itcount = 0
             while True:
                 UpdatePos = 0
+                UpdatePosInner = 0
                 NewInner = ""
 
                 match = MatchPattern(self.FindOpenPattern, [TmpMap['IOobj']], InternalText)
@@ -420,7 +421,6 @@ class BlockFiles(object):
 
                     # Need to go back to the to look for the DeclareIO
                     InternalText = NewInner + InternalText[UpdatePos:]
-                    UpdatePosInner = 0
                     NewInner = ""
                     match = MatchPattern(self.FindDeclareIOPatternByIO, [TmpMap['IOobj']], InternalText)
                     if match is not None:
@@ -448,45 +448,51 @@ class BlockFiles(object):
             if (only is not None) and (TmpMap['EngineName'] not in only):
                 continue
 
-            UpdatePos = 0
-            NewInner = ""
-
-            TmpEngine = TmpMap['EngineObj']
-            for char in ['[', ']', '(', ')']:
-                TmpEngine = TmpEngine.replace(char, "\\" + char)
-
-            match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
-            if match is not None:
-                status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
-
-            match = MatchPattern(self.FindEndPattern, [TmpMap['EngineObj']], InternalText)
-            if match is not None:
-                nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
-
-            match = MatchPattern(self.FindClosePattern, [TmpMap['EngineObj']], InternalText)
-            if match is not None:
-                nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
-
-            # Need to go back to the to look for the Open
-            NewInner += InternalText[UpdatePos:]
-            InternalText = NewInner
-            UpdatePos = 0
-            NewInner = ""
-            match = MatchPattern(self.FindOpenPatternByEngine, [TmpMap['EngineObj']], InternalText)
-            if match is not None:
-                io, NewInner, UpdatePos = self.ReverseReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='EngineName')
-
-                # Need to go back to the to look for the DeclareIO
-                NewInner += InternalText[UpdatePos:]
-                InternalText = NewInner
+            io = None
+            itcount = 0
+            while True:
                 UpdatePos = 0
+                UpdatePosOuter = 0
+                UpdatePosInner = 0
                 NewInner = ""
-                match = MatchPattern(self.FindDeclareIOPatternByIO, [io], InternalText)
-                if match is not None:
-                    name, NewInner, UpdatePos = self.ReverseReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='EngineName', IOobj=io)
 
-            NewInner += InternalText[UpdatePos:]
-            InternalText = NewInner
+                TmpEngine = TmpMap['EngineObj']
+                for char in ['[', ']', '(', ')']:
+                    TmpEngine = TmpEngine.replace(char, "\\" + char)
+
+                match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
+                if match is not None:
+                    status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
+
+                match = MatchPattern(self.FindEndPattern, [TmpMap['EngineObj']], InternalText)
+                if match is not None:
+                    nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
+
+                match = MatchPattern(self.FindClosePattern, [TmpMap['EngineObj']], InternalText)
+                if match is not None:
+                    nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, TmpMap['EngineObj'], NameKey='EngineName')
+
+                # Need to go back to the to look for the Open
+                InternalText = NewInner + InternalText[UpdatePos:]
+                NewInner = ""
+
+                match = MatchPattern(self.FindOpenPatternByEngine, [TmpMap['EngineObj']], InternalText)
+                if (match is not None) or (itcount > 0):
+                    if match is not None:
+                        io, NewInner, UpdatePosOuter = self.ReverseReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePosOuter, NameKey='EngineName')
+
+                    if io is not None:
+                        InternalText = NewInner + InternalText[UpdatePosOuter:]
+                        NewInner = ""
+                        match = MatchPattern(self.FindDeclareIOPatternByIO, [io], InternalText)
+                        if match is not None:
+                            name, NewInner, UpdatePosInner = self.ReverseReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePosInner, NameKey='EngineName', IOobj=io)
+
+                InternalText = NewInner + InternalText[UpdatePosInner:]
+                itcount += 1
+
+                if (UpdatePos == 0) and (UpdatePosInner == 0) and (UpdatePosOuter == 0):
+                    break
 
         return InternalText
 
