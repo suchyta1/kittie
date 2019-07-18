@@ -390,40 +390,47 @@ class BlockFiles(object):
             if (only is not None) and (TmpMap['IOName'] not in only):
                 continue
 
-            UpdatePos = 0
-            NewInner = ""
-
-            match = MatchPattern(self.FindOpenPattern, [TmpMap['IOobj']], InternalText)
-            if match is not None:
-                engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='IOName')
-
-                TmpEngine = engine
-                for char in ['[', ']', '(', ')']:
-                    TmpEngine = TmpEngine.replace(char, "\\" + char)
-
-                match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
-                if match is not None:
-                    status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
-
-                match = MatchPattern(self.FindEndPattern, [engine], InternalText)
-                if match is not None:
-                    nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
-
-                match = MatchPattern(self.FindClosePattern, [engine], InternalText)
-                if match is not None:
-                    nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
-
-                # Need to go back to the to look for the DeclareIO
-                NewInner += InternalText[UpdatePos:]
-                InternalText = NewInner
+            engine = None
+            itcount = 0
+            while True:
                 UpdatePos = 0
                 NewInner = ""
-                match = MatchPattern(self.FindDeclareIOPatternByIO, [TmpMap['IOobj']], InternalText)
-                if match is not None:
-                    name, NewInner, UpdatePos = self.ReverseReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='IOName', IOobj=TmpMap['IOobj'])
 
-            NewInner += InternalText[UpdatePos:]
-            InternalText = NewInner
+                match = MatchPattern(self.FindOpenPattern, [TmpMap['IOobj']], InternalText)
+                if (match is not None) or (itcount > 0):
+                    if match is not None:
+                        engine, NewInner, UpdatePos = self.ForwardReplaceOpen(match, TmpMap, InternalText, NewInner, UpdatePos, NameKey='IOName')
+
+                    if engine is not None:
+                        TmpEngine = engine
+                        for char in ['[', ']', '(', ')']:
+                            TmpEngine = TmpEngine.replace(char, "\\" + char)
+
+                        match = MatchPattern(self.FindBeginPattern(TmpEngine), [], InternalText)
+                        if match is not None:
+                            status, NewInner, UpdatePos = self.ForwardReplaceBegin(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
+
+                        match = MatchPattern(self.FindEndPattern, [engine], InternalText)
+                        if match is not None:
+                            nothing, NewInner, UpdatePos = self.ForwardReplaceEnd(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
+
+                        match = MatchPattern(self.FindClosePattern, [engine], InternalText)
+                        if match is not None:
+                            nothing, NewInner, UpdatePos = self.ForwardReplaceClose(match, TmpMap, InternalText, NewInner, UpdatePos, engine, NameKey='IOName')
+
+                    # Need to go back to the to look for the DeclareIO
+                    InternalText = NewInner + InternalText[UpdatePos:]
+                    UpdatePosInner = 0
+                    NewInner = ""
+                    match = MatchPattern(self.FindDeclareIOPatternByIO, [TmpMap['IOobj']], InternalText)
+                    if match is not None:
+                        name, NewInner, UpdatePosInner = self.ReverseReplaceDeclare(match, TmpMap, InternalText, NewInner, UpdatePosInner, NameKey='IOName', IOobj=TmpMap['IOobj'])
+
+                InternalText = NewInner + InternalText[UpdatePosInner:]
+                itcount += 1
+
+                if (UpdatePos == 0) and (UpdatePosInner == 0):
+                    break
 
         return InternalText
 
