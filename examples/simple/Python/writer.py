@@ -41,7 +41,7 @@ if __name__ == "__main__":
     RandomInts2 = np.random.randint(0, 1000, size=nelems, dtype=np.int32)
 
 
-    #@effis-begin io-->"Jaberwocky"
+    #@effis-begin engine--->"Jaberwocky"
     io = adios.DeclareIO("Jabberwocky")
 
     GlobalDims = [size * nelems]
