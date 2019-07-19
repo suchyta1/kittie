@@ -30,7 +30,6 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
 
-
     # Test scalars
     if rank == 0:
         KnownInt = np.array([666])
@@ -44,7 +43,6 @@ if __name__ == "__main__":
 
     #@effis-begin "Jabberwocky"->"Jaberwocky"
     io = adios.DeclareIO("Jabberwocky")
-    #@effis-end
 
     GlobalDims = [size * nelems]
     Offsets = [rank * nelems]
@@ -59,13 +57,9 @@ if __name__ == "__main__":
 
     # Open
     if mpi.UseComm:
-        #@effis-begin io-->"Jaberwocky"
         engine = io.Open("Jabberwocky.bp", adios2.Mode.Write, comm)
-        #@effis-end
     else:
-        #@effis-begin io-->"Jaberwocky"
         engine = io.Open("Jabberwocky.bp", adios2.Mode.Write)
-        #@effis-end
 
 
     # Write
@@ -75,7 +69,6 @@ if __name__ == "__main__":
         engine.Put(vRandomInt, RandomInt)
 
 
-    #@effis-begin engine--->"Jaberwocky"
     for i in range(10):
         RandomInts = np.random.randint(0, 1000, size=nelems, dtype=np.int64)
         RandomInts2 = np.random.randint(0, 1000, size=nelems, dtype=np.int64)
