@@ -34,7 +34,7 @@ def Plot(data, xname, outdir, fs=20):
         ax.set_ylabel(name,  fontsize=fs)
         ax.set_title("{1},  time = {0:.1e}".format(data['_StepPhysical'][0], name),  fontsize=fs)
 
-        fig.savefig(os.path.join(outdir, "{0}_vs_{1}-{2}.svg".format(name, xname, data['_StepNumber'][0])), bbox_inches="tight")
+        fig.savefig(os.path.join(outdir, "{0}_vs_{1}-{2}.svg".format(name.replace('/', '|'), xname.replace('/', '|'), data['_StepNumber'][0])), bbox_inches="tight")
         plt.close(fig)
 
 

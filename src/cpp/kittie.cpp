@@ -224,6 +224,10 @@ void kittie::finalize()
 
 	if (kittie::stepinit)
 	{
+		std::ofstream outfile;
+		outfile.open(kittie::StepGroupname + ".done");
+		outfile << kittie::_StepNumber;
+		outfile.close();
 		kittie::StepEngine.Close();
 	}
 
@@ -242,8 +246,8 @@ void kittie::write_step(double physical, int number)
 		if (!kittie::stepinit)
 		{
 			adios2::IO io = kittie::adios->DeclareIO(kittie::StepGroupname);
-			adios2::Variable<int> VarNumber = io.DefineVariable<int>("number");
-			adios2::Variable<double> VarStep = io.DefineVariable<double>("physical");
+			adios2::Variable<int> VarNumber = io.DefineVariable<int>("StepNumber");
+			adios2::Variable<double> VarStep = io.DefineVariable<double>("StepPhysical");
 			io.SetEngine("SST");
 			io.SetParameter("RendezvousReaderCount", "0");
 			io.SetParameter("QueueLimit", "1");
@@ -259,8 +263,8 @@ void kittie::write_step(double physical, int number)
 		}
 
 		kittie::StepEngine.BeginStep();
-		kittie::StepEngine.Put<int>("number", &kittie::_StepNumber);
-		kittie::StepEngine.Put<double>("physical", &kittie::_StepPhysical);
+		kittie::StepEngine.Put<int>("StepNumber", &kittie::_StepNumber);
+		kittie::StepEngine.Put<double>("StepPhysical", &kittie::_StepPhysical);
 		kittie::StepEngine.EndStep();
 	}
 }
@@ -292,21 +296,27 @@ adios2::IO kittie::declare_io(const std::string groupname)
 // @effis-timestep -- Can't DefineVariables in DeclareIO b/c don't know read/write mode
 void kittie::Coupler::AddStep()
 {
+	std::cout << "AddStep A" << std::endl;
 	if (!FindStep && (std::find(kittie::StepGroups.begin(), kittie::StepGroups.end(), groupname) != kittie::StepGroups.end() || kittie::AllStep))
 	{
+		std::cout << "AddStep A.1" << std::endl;
 		FindStep = true;
 		if ((mode == adios2::Mode::Write) && (kittie::rank == 0))
 		{
+			std::cout << "AddStep A.2" << std::endl;
 			adios2::Variable<int> VarNumber  = io->DefineVariable<int>("_StepNumber");
 			adios2::Variable<double> VarStep = io->DefineVariable<double>("_StepPhysical");
 		}
 	}
 
+	std::cout << "AddStep B" << std::endl;
 	if (FindStep && (mode == adios2::Mode::Write) && (kittie::rank == 0))
 	{
+		std::cout << "AddStep B.1" << std::endl;
 		engine.Put<int>("_StepNumber", kittie::_StepNumber);
 		engine.Put<double>("_StepPhysical", kittie::_StepPhysical);
 	}
+	std::cout << "AddStep C" << std::endl;
 }
 
 
