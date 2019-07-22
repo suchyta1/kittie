@@ -29,7 +29,7 @@ def Plot(data, xname, outdir, fs=20):
         fig = plt.figure(figsize=(7,6))
         ax = fig.add_subplot(gs[0, 0])
 
-        ax.plot(data[xname], data[name])
+        ax.plot(data[xname].flatten(), data[name].flatten())
         ax.set_xlabel(xname, fontsize=fs)
         ax.set_ylabel(name,  fontsize=fs)
         ax.set_title("{1},  time = {0:.1e}".format(data['_StepPhysical'][0], name),  fontsize=fs)
@@ -44,6 +44,7 @@ def ParseArgs():
     parser.add_argument("xaxis", help="What to use as x-axis for plotting")
     parser.add_argument("-o", "--only",     help="Only plot the given y-values", type=str, default=[])
     parser.add_argument("-e", "--exclude", help="Don't plot the given y-values", type=str, default=[])
+    parser.add_argument("-y", "--y", help="How to generate Y-value(s)", type=str, default="match-dimensions")
     args = parser.parse_args()
 
     if len(args.only) > 0:
@@ -64,14 +65,14 @@ if __name__ == "__main__":
     adios = adios2.ADIOS(comm)
     plotter = plot_util.KittiePlotter(comm)
     plotter.ConnectToStepInfo(adios, group="plotter")
-    plotter.GetMatchingSelections(adios, args.xaxis, exclude=args.exclude, only=args.only, xomit=True)
+    plotter.GetMatchingSelections(adios, args.xaxis, exclude=args.exclude, only=args.only, xomit=True, y=args.y)
 
     if plotter.Active:
 
         while plotter.NotDone:
 
             if plotter.DoPlot:
-                plotter.GetPlotData()
+                plotter.GetPlotData(y=args.y)
                 Plot(plotter.data, plotter.DimInfo['xname'], plotter.outdir)
                 plotter.StepDone()
 

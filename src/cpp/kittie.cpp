@@ -296,27 +296,21 @@ adios2::IO kittie::declare_io(const std::string groupname)
 // @effis-timestep -- Can't DefineVariables in DeclareIO b/c don't know read/write mode
 void kittie::Coupler::AddStep()
 {
-	std::cout << "AddStep A" << std::endl;
 	if (!FindStep && (std::find(kittie::StepGroups.begin(), kittie::StepGroups.end(), groupname) != kittie::StepGroups.end() || kittie::AllStep))
 	{
-		std::cout << "AddStep A.1" << std::endl;
 		FindStep = true;
 		if ((mode == adios2::Mode::Write) && (kittie::rank == 0))
 		{
-			std::cout << "AddStep A.2" << std::endl;
 			adios2::Variable<int> VarNumber  = io->DefineVariable<int>("_StepNumber");
 			adios2::Variable<double> VarStep = io->DefineVariable<double>("_StepPhysical");
 		}
 	}
 
-	std::cout << "AddStep B" << std::endl;
 	if (FindStep && (mode == adios2::Mode::Write) && (kittie::rank == 0))
 	{
-		std::cout << "AddStep B.1" << std::endl;
 		engine.Put<int>("_StepNumber", kittie::_StepNumber);
 		engine.Put<double>("_StepPhysical", kittie::_StepPhysical);
 	}
-	std::cout << "AddStep C" << std::endl;
 }
 
 

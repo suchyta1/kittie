@@ -29,6 +29,24 @@ def GetType(varid):
     return UserType
 
 
+def ShapeParse(xShape, xsel):
+    counts = np.array(xShape, dtype=np.int64)
+    starts = np.zeros(counts.shape[0], dtype=np.int64)
+    if xsel is not None:
+        for j, dim in enumerate(xShape):
+            if (j >= len(xsel)) or (xsel[j] == ":"):
+                continue
+            else:
+                if xsel[j].find(":") != -1:
+                    start, stop = xsel[j].split(":")
+                    starts[j] = int(start.strip())
+                    counts[j] = int( stop.strip()) - start[j]
+                else:
+                    starts[j] = int(xsel[j])
+                    counts[j] = 1
+    return starts, counts
+
+
 class KittiePlotter(object):
     
     def __init__(self, comm):
@@ -46,6 +64,16 @@ class KittiePlotter(object):
             del self.config['mpmd']
 
 
+    def _InitByCommSize(self):
+        size = self.comm.Get_size()
+        self.DimInfo['UserMatches'] = []
+        self.DimInfo['UserTypes'] = []
+        for i in range(size):
+            self.DimInfo['UserMatches'] += [[]]
+            self.DimInfo['UserTypes'] += [[]]
+        return size
+
+
     def _GetMatching(self, exclude=[], only=[], xomit=False):
         vx = self.io.InquireVariable(self.DimInfo['xname'])
         shape = vx.Shape()
@@ -59,13 +87,8 @@ class KittiePlotter(object):
         if (self.DimInfo['xname'] not in only) and (not xomit):
             only += [self.DimInfo['xname']]
 
-        size = self.comm.Get_size()
-        self.DimInfo['UserMatches'] = []
-        self.DimInfo['UserTypes'] = []
+        size = self._InitByCommSize()
         index = 0
-        for i in range(size):
-            self.DimInfo['UserMatches'] += [[]]
-            self.DimInfo['UserTypes'] += [[]]
 
         for name in only:
             if (name in exclude) or ((name == self.DimInfo['xname']) and xomit):
@@ -83,18 +106,53 @@ class KittiePlotter(object):
         return shape
 
 
-    def _xParse(self, xname):
-        self.DimInfo['xname'] = xname
+    def _xParse(self, xname, getname=False):
+        if getname:
+            rname = xname
+        else:
+            self.DimInfo['xname'] = xname
+
         if xname.endswith(']'):
             start = xname.find('[')
-            self.DimInfo['xname'] = xname[:start]
+            if getname:
+                rname = xname[:start]
+            else:
+                self.DimInfo['xname'] = xname[:start]
             xdims = xname[start+1:-1]
             xdims = xdims.split(',')
             for i in range(len(xdims)):
                 xdims[i] = xdims[i].strip()
         else:
             xdims = None
-        return xdims
+
+        if getname:
+            return xdims, rname
+        else:
+            return xdims
+
+
+    def _GetExplicit(self, xaxis, y):
+        xsel, xname = self._xParse(xaxis, getname=True)
+        ysel, yname = self._xParse(y, getname=True)
+        size = self._InitByCommSize()
+        index = 0
+        for name in [xname, yname]:
+            i = index % size
+            varid = self.io.InquireVariable(name)
+            if name == xname:
+                xShape = varid.Shape()
+                xtype = GetType(varid)
+                self.DimInfo['xname'] = xname
+                self.DimInfo['xType'] = xtype
+            else:
+                yShape = varid.Shape()
+                ytype = GetType(varid)
+                self.DimInfo['UserMatches'][i] += [name]
+                self.DimInfo['UserTypes'][i] += [ytype]
+            index += 1
+        xstart, xcount = ShapeParse(xShape, xsel)
+        ystart, ycount = ShapeParse(yShape, ysel)
+        return xstart, xcount, xname, xtype, ystart, ycount, yname, ytype
 
 
     def _GetSelections(self, xaxis, exclude=[], only=[], xomit=False):
@@ -106,26 +164,12 @@ class KittiePlotter(object):
         xShape = self._GetMatching(exclude=exclude, only=only, xomit=False)
 
         # Get ADIOS selections
-        counts = np.array(xShape, dtype=np.int64)
-        starts = np.zeros(counts.shape[0], dtype=np.int64)
-        if xsel is not None:
-            for j, dim in enumerate(xShape):
-                if (j >= len(xsel)) or (xsel[j] == ":"):
-                    continue
-                else:
-                    if xsel[j].find(":") != -1:
-                        start, stop = xsel[j].split(":")
-                        starts[j] = int(start.strip())
-                        counts[j] = int( stop.strip()) - start[j]
-                    else:
-                        starts[j] = int(xsel[j])
-                        counts[j] = 1
-
+        starts, counts = ShapeParse(xShape, xsel)
         self.DimInfo['starts'] = list(starts)
         self.DimInfo['counts'] = list(counts)
 
 
-    def _SetupArrays(self, allx):
+    def _SetupArrays(self, allx, explicit=False):
         self.uMatches = self.DimInfo['UserMatches']
         self.uTypes = self.DimInfo['UserTypes']
         if allx:
@@ -135,8 +179,9 @@ class KittiePlotter(object):
         self.data = {}
         self.data['_StepPhysical'] = np.zeros(1, dtype=np.float64)
         self.data['_StepNumber'] = np.zeros(1, dtype=np.int64)
-        for name, dtype in zip(self.uMatches, self.uTypes):
-            self.data[name] = np.zeros(tuple(self.DimInfo['counts']), dtype=dtype)
+        if not explicit:
+            for name, dtype in zip(self.uMatches, self.uTypes):
+                self.data[name] = np.zeros(tuple(self.DimInfo['counts']), dtype=dtype)
 
 
     def ConnectToStepInfo(self, adios, group=None):
@@ -193,27 +238,40 @@ class KittiePlotter(object):
             return False
 
 
-    def GetMatchingSelections(self, adios, xaxis, exclude=[], only=[], xomit=False, allx=True):
+    def GetMatchingSelections(self, adios, xaxis, exclude=[], only=[], xomit=False, allx=True, y="match-dimensions"):
         self.DimInfo = {}
-        for name in ["xname", "starts", "counts", "UserMatches", "UserTypes", "xType"]:
+        for name in ["xname", "xType", "UserMatches", "UserTypes"]:
             self.DimInfo[name] = None
+        if y == "match-dimensions":
+            explicit = False
+            for name in ["starts", "counts"]:
+                self.DimInfo[name] = None
+        else:
+            explicit = True
 
         #@effis-begin self.gname->self.gname
         self.io = adios.DeclareIO(self.gname)
         if self.rank == 0:
             self.engine = self.io.Open(self.gname, adios2.Mode.Read, MPI.COMM_SELF)
-            self._GetSelections(xaxis, exclude=exclude, only=only, xomit=xomit)
+            if y == "match-dimensions":
+                self._GetSelections(xaxis, exclude=exclude, only=only, xomit=xomit)
+            else:
+                xstart, xcount, xname, xtype, ystart, ycount, yname, ytype = self._GetExplicit(xaxis, y)
             self.engine.Close()
             self.io.RemoveAllVariables()
             self.io.RemoveAllAttributes()
-            if not os.path.exists('images'):
-                os.makedirs('images')
         #@effis-end
 
-        for name in ['xname', 'xType', 'starts', 'counts']:
+        if y == "match-dimensions":
+            for name in ['starts', 'counts']:
+                self.DimInfo[name] = self.comm.bcast(self.DimInfo[name], root=0)
+        for name in ['xname', 'xType']:
             self.DimInfo[name] = self.comm.bcast(self.DimInfo[name], root=0)
         for name in ['UserMatches', 'UserTypes']:
             self.DimInfo[name] = self.comm.scatter(self.DimInfo[name], root=0)
+
+        if (self.rank == 0) and (not os.path.exists('images')):
+            os.makedirs('images')
 
         # Only do something on the processes where there's a plot
         color = 0
@@ -222,7 +280,12 @@ class KittiePlotter(object):
         self.ReadComm = self.comm.Split(color, self.rank)
 
         if self.Active:
-            self._SetupArrays(allx)
+            self._SetupArrays(allx, explicit=explicit)
+            if explicit:
+                self.data[xname] = np.zeros(tuple(xcount), dtype=xtype)
+                self.data[yname] = np.zeros(tuple(ycount), dtype=ytype)
+                self.uStarts = [ystart, xstart]
+                self.uCounts = [ycount, xcount]
             filename = None
 
             #@effis-begin self.io-->"plotter"
@@ -294,24 +357,35 @@ class KittiePlotter(object):
         return True
 
 
-    def _ScheduleReads(self):
+    def _ScheduleReads(self, y="match-dimensions"):
         self.data['minmax'] = {}
         for name in ['_StepPhysical', '_StepNumber']:
             varid = self.io.InquireVariable(name)
             self.engine.Get(varid, self.data[name])
-        for name in self.uMatches:
-            varid = self.io.InquireVariable(name)
-            varid.SetSelection([self.DimInfo['starts'], self.DimInfo['counts']])
-            self.engine.Get(varid, self.data[name])
-            variables = self.io.AvailableVariables()
-            self.data['minmax'][name] = {}
-            self.data['minmax'][name]['min'] = float(variables[name]['Min'])
-            self.data['minmax'][name]['max'] = float(variables[name]['Max'])
+
+        variables = self.io.AvailableVariables()
+
+        if y == "match-dimensions":
+            for name in self.uMatches:
+                varid = self.io.InquireVariable(name)
+                varid.SetSelection([self.DimInfo['starts'], self.DimInfo['counts']])
+                self.engine.Get(varid, self.data[name])
+                self.data['minmax'][name] = {}
+                self.data['minmax'][name]['min'] = float(variables[name]['Min'])
+                self.data['minmax'][name]['max'] = float(variables[name]['Max'])
+        else:
+            for name, start, count in zip(self.uMatches, self.uStarts, self.uCounts):
+                varid = self.io.InquireVariable(name)
+                varid.SetSelection([start, count])
+                self.engine.Get(varid, self.data[name])
+                self.data['minmax'][name] = {}
+                self.data['minmax'][name]['min'] = float(variables[name]['Min'])
+                self.data['minmax'][name]['max'] = float(variables[name]['Max'])
 
 
-    def GetPlotData(self):
+    def GetPlotData(self, y="match-dimensions"):
 
-        self._ScheduleReads()
+        self._ScheduleReads(y=y)
 
         #@effis-begin self.engine--->"plotter"
         self.engine.EndStep()
