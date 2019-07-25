@@ -13,46 +13,73 @@ import plot_util
 from mpi4py import MPI
 
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import matplotlib.tri as tri
-from matplotlib.ticker import FormatStrFormatter
+
+inits = {}
+gs = {}
+fig = {}
+ax = {}
+kwargs = {}
+ColorAxis = {}
+ColorBar = {}
 
 
-def Plot(data, outdir, fs=20, xname="x", yname="y", cmap="bwr", minmax=False):
+def Plot(data, outdir, fs=20, xname="x", yname="y", cmap="bwr", minmax=False, interactive="image", ext="svg"):
 
     for name in data.keys():
         if name in ['_StepPhysical', '_StepNumber', 'minmax']:
             continue
-
         print(name, data['_StepNumber'], data['_StepPhysical']); sys.stdout.flush()
 
-        gs = gridspec.GridSpec(1, 1)
-        fig = plt.figure(figsize=(7,6))
-        ax = fig.add_subplot(gs[0, 0])
+        if name not in inits:
+            inits[name] = False
 
-        kwargs = {}
-        kwargs['cmap'] = plt.get_cmap(cmap)
-        kwargs['origin'] = "lower"
+        if not inits[name]:
+            print(name)
+            gs[name] = gridspec.GridSpec(1, 1)
+            fig[name] = plt.figure(figsize=(7,6), tight_layout=True)
+            ax[name] = fig[name].add_subplot(gs[name][0, 0])
+            kwargs[name] = {}
+            kwargs[name]['cmap'] = plt.get_cmap(cmap)
+            kwargs[name]['origin'] = "lower"
         if minmax:
             opt = np.amax(np.fabs([data['minmax'][name]['min'], data['minmax'][name]['max']])) + 1e-20
-            kwargs['vmin'] = -opt
-            kwargs['vmax'] = opt
+            kwargs[name]['vmin'] = -opt
+            kwargs[name]['vmax'] = opt
 
-        ColorAxis = ax.imshow(data[name].squeeze(), **kwargs)
-        ColorBar = fig.colorbar(ColorAxis, ax=ax, format="%+.2e")
-        ColorBar.set_label(name, fontsize=fs)
+        if not inits[name]:
+            ColorAxis[name] = ax[name].imshow(data[name].squeeze(), **(kwargs[name]))
+            ColorBar[name] = fig[name].colorbar(ColorAxis[name], ax=ax[name], format="%+.2e")
+            ColorBar[name].set_label(name, fontsize=fs)
+            ax[name].set_xlabel(xname, fontsize=fs)
+            ax[name].set_ylabel(yname, fontsize=fs)
+        else:
+            ColorAxis[name].set_data(data[name].squeeze())
+            if minmax:
+                ColorAxis[name].set_clim(cmin=kwargs[name]['vmin'], cmax=kwargs[name]['vmax'])
+            else:
+                ColorAxis[name].autoscale()
+
+        ax[name].set_title("{1},  time = {0:.1e}".format(data['_StepPhysical'][0], name),  fontsize=fs)
         if minmax:
             ticks = np.linspace(-opt, opt, 7)
-            ColorBar.set_ticks(ticks)
+            ColorBar[name].set_ticks(ticks)
 
-        ax.set_xlabel(xname, fontsize=fs)
-        ax.set_ylabel(yname, fontsize=fs)
-        ax.set_title("{1},  time = {0:.1e}".format(data['_StepPhysical'][0], name),  fontsize=fs)
+        if not inits[name]:
+            inits[name] = True
+        else:
+            if interactive != 'image':
+                fig[name].tight_layout()
+                fig[name].canvas.draw()
+                fig[name].canvas.flush_events()
 
-        fig.savefig(os.path.join(outdir, "{0}_vs_{2}_{3}-{1}.svg".format(name.replace('/', '|'), data['_StepNumber'][0], xname, yname)), bbox_inches="tight")
-        plt.close(fig)
+        if interactive != "interactive":
+            fig[name].savefig(os.path.join(outdir, "{0}_vs_{2}_{3}-{1}.{4}".format(name.replace('/', '|'), data['_StepNumber'][0], xname, yname, ext)), bbox_inches="tight")
+
+        #plt.close(fig)
+        
 
 
 
@@ -63,6 +90,9 @@ def ParseArgs():
     parser.add_argument("-o", "--only",     help="Only plot the given y-values", type=str, default=[])
     parser.add_argument("-e", "--exclude",  help="Don't plot the given y-values", type=str, default=[])
     parser.add_argument("-c", "--colormap", help="Colormap to use", type=str, default="bwr")
+    parser.add_argument("-t", "--type", help="Image file and/or interactive", type=str, default="image", choices=["image", "interactive", "both"])
+    parser.add_argument("-x", "--ext", help="Image extension", type=str, default="svg", choices=["svg", "png"])
+
     args = parser.parse_args()
 
     if len(args.only) > 0:
@@ -86,12 +116,14 @@ if __name__ == "__main__":
 
 
     if plotter.Active:
+        if args.type != "image":
+            plt.ion()
 
         while plotter.NotDone:
 
             if plotter.DoPlot:
                 plotter.GetPlotData()
-                Plot(plotter.data, plotter.outdir, xname="x", yname="y", cmap=args.colormap, minmax=False)
+                Plot(plotter.data, plotter.outdir, xname="x", yname="y", cmap=args.colormap, minmax=False, interactive=args.type, ext=args.ext)
                 plotter.StepDone()
 
     #@effis-finalize
