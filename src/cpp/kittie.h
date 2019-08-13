@@ -53,7 +53,7 @@
 
 
 				// Destructor
-				~Coupler();
+				//~Coupler();
 
 
 				// Methods
@@ -80,40 +80,39 @@
 		};
 
 
-		// "Private"
-		bool mpi;
-		MPI_Comm comm;
-		int rank;
-		adios2::ADIOS* adios;
+		// MPI
+		extern bool mpi;
+		extern MPI_Comm comm;
+		extern int rank;
+
+		// ADIOS-related
+		extern int ngroups;
+		extern int nnames;
+		extern adios2::ADIOS* adios;
+		extern std::string myreading;
+		extern std::string Codename;
+		extern std::string writing;
+		extern std::string reading;
+		extern std::vector<std::string> _FileMethods;
+		extern std::vector<std::string> allreading;
+		extern std::vector<std::string> groupnames;
 		extern std::map<std::string, Coupler*> Couplers;
-		std::vector<std::string> _FileMethods {"bpfile", "bp", "bp3", "hdf5"};
-		std::string writing = ".writing";
-		std::string reading = ".reading";
-		std::vector<std::string> allreading;
-		std::string myreading;
-
-		//std::string appname;
-		std::string Codename;
-		int ngroups;
-		std::vector<std::string> groupnames;
-
-		int nnames;
-		std::map<std::string, std::string> filenames;
-		std::map<std::string, std::string> setengines;
-		std::map<std::string, std::map<std::string, std::string>> setparams;
-
+		extern std::map<std::string, std::string> filenames;
+		extern std::map<std::string, std::string> setengines;
+		extern std::map<std::string, std::map<std::string, std::string>> setparams;
 
 		// @effis-timestep
-		bool stepinit;
-		bool AllStep;
-		int _StepNumber;
-		double _StepPhysical;
-		std::string StepGroupname;
-		adios2::Engine StepEngine;
-		std::vector<std::string> StepGroups;
+		extern bool stepinit;
+		extern bool AllStep;
+		extern int _StepNumber;
+		extern double _StepPhysical;
+		extern adios2::Engine StepEngine;
+		extern std::string StepGroupname;
+		extern std::vector<std::string> StepGroups;
+
+
 		void write_step(double physical, int number);
 		void write_step(double physical, int number, MPI_Comm comm);
-
 
 		void _buildyaml();
 		void _groupsyaml();

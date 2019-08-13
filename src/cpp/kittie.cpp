@@ -1,8 +1,6 @@
 #include "kittie.h"
 
 
-/* global namespace */
-
 #ifndef USE_MPI
 	int MPI_Comm_dup(MPI_Comm incomm, MPI_Comm* outcomm)
 	{
@@ -24,6 +22,36 @@
 #endif
 
 
+// MPI
+bool kittie::mpi;
+MPI_Comm kittie::comm;
+int kittie::rank;
+
+// ADIOS-related
+int kittie::ngroups;
+int kittie::nnames;
+adios2::ADIOS* kittie::adios;
+std::string kittie::myreading;
+std::string kittie::Codename;
+std::string kittie::writing = ".writing";
+std::string kittie::reading = ".reading";
+std::vector<std::string> kittie::_FileMethods;
+std::vector<std::string> kittie::allreading;
+std::vector<std::string> kittie::groupnames;
+std::map<std::string, kittie::Coupler*> kittie::Couplers;
+std::map<std::string, std::string> kittie::filenames;
+std::map<std::string, std::string> kittie::setengines;
+std::map<std::string, std::map<std::string, std::string>> kittie::setparams;
+
+// @effis-timestep
+bool kittie::stepinit;
+bool kittie::AllStep;
+int kittie::_StepNumber;
+double kittie::_StepPhysical;
+adios2::Engine kittie::StepEngine;
+std::string kittie::StepGroupname;
+std::vector<std::string> kittie::StepGroups;
+
 
 
 bool kittie::Exists(std::string filename)
@@ -43,10 +71,6 @@ void kittie::Touch(std::string filename)
 }
 
 
-
-/* kittie namespace */
-
-std::map<std::string, kittie::Coupler*> kittie::Couplers;
 
 
 /*
@@ -82,10 +106,13 @@ void kittie::_groupsyaml()
 	kittie::setengines.clear();
 	kittie::setparams.clear();
 
+	YAML::Node groupsyaml;
+	YAML::Node params;
+	std::map<std::string, std::string> param;
+
 	if(Exists(yamlfile))
 	{
-		YAML::Node groupsyaml = YAML::LoadFile(yamlfile);
-		std::map<std::string, std::string> param;
+		groupsyaml = YAML::LoadFile(yamlfile);
 
 		for(YAML::const_iterator it=groupsyaml.begin(); it!=groupsyaml.end(); ++it)
 		{
@@ -100,8 +127,9 @@ void kittie::_groupsyaml()
 			{
 				kittie::setengines[name] = groupsyaml[name]["engine"].as<std::string>();
 			}
-			if (YAML::Node params=groupsyaml[name]["params"])
+			if (groupsyaml[name]["params"])
 			{
+				params = groupsyaml[name]["params"];
 				for(YAML::const_iterator pit=params.begin(); pit!=params.end(); ++pit)
 				{
 					param[pit->first.as<std::string>()] = pit->second.as<std::string>();
@@ -129,22 +157,25 @@ void kittie::_codesyaml()
 	std::string num(env_n);
 	std::string yamlfile = ".kittie-codenames-" + num + ".yaml";
 
+	YAML::Node codesyaml;
+	YAML::Node codes;
+	std::string thisname;
+
 	if(Exists(yamlfile))
 	{
-		YAML::Node codesyaml = YAML::LoadFile(yamlfile);
-		YAML::Node codes = codesyaml["codes"];
-		std::string thisname;
+		codesyaml = YAML::LoadFile(yamlfile);
+		codes = codesyaml["codes"];
 		kittie::Codename = codesyaml["codename"].as<std::string>();
-		kittie::myreading = reading + "-" + kittie::Codename;
+		kittie::myreading = kittie::reading + "-" + kittie::Codename;
 		for(std::size_t i=0; i<codes.size(); i++)
 		{
-			thisname = reading + "-" + codes[i].as<std::string>();
+			thisname = kittie::reading + "-" + codes[i].as<std::string>();
 			kittie::allreading.push_back(thisname);
 		}
 	}
 	else
 	{
-		kittie::myreading = reading;
+		kittie::myreading = kittie::reading;
 		kittie::allreading.push_back(kittie::myreading);
 	}
 
@@ -383,7 +414,7 @@ kittie::Coupler::Coupler(const std::string ingroupname)
 }
 
 
-kittie::Coupler::~Coupler(){}
+//kittie::Coupler::~Coupler(){}
 
 
 void kittie::Coupler::Until_Nonexistent_Write()
