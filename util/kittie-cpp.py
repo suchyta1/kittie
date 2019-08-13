@@ -1009,7 +1009,8 @@ def Tar(directory, outdir):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     name = ".src.tar.gz"
-    subprocess.call(["tar", "-czf", os.path.join(outdir, name), directory])
+    #subprocess.call(["tar", "czf", os.path.join(outdir, name), directory])
+    subprocess.call(["tar", "czf", os.path.join(outdir, name), "-C", os.path.dirname(directory), os.path.basename(directory)])
 
 
 if __name__ == "__main__":
