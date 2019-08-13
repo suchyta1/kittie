@@ -1,4 +1,3 @@
-#include_directories(${ADIOS2_INCLUDE_DIRS})
 add_definitions(-ffree-line-length-none)
 
 if(USE_MPI)
@@ -14,7 +13,6 @@ endif()
 
 set(module_objects ${CMAKE_CURRENT_SOURCE_DIR}/kittie.F90 ${CMAKE_CURRENT_SOURCE_DIR}/kittie_internal.F90)
 add_library(kittie_f ${module_objects})
-#target_link_libraries(kittie_f PRIVATE ${libadios2} ${libfortran})
 target_link_libraries(kittie_f PRIVATE adios2::adios2_f)
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/kittie.F90  PROPERTIES OBJECT_DEPENDS  ${CMAKE_CURRENT_SOURCE_DIR}/kittie_internal.F90)
 
