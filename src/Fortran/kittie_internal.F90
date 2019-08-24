@@ -59,12 +59,12 @@ module kittie_internal
 
 		subroutine touch_file(fname)
 			character(len=*), intent(in) :: fname
-			if (touch) then
-				call execute_command_line("touch " // trim(fname))
-			else
+			!if (touch) then
+			!	call execute_command_line("touch " // trim(fname))
+			!else
 				open(unit=iounit, file=trim(fname), status='new')
 				close(iounit)
-			end if
+			!end if
 		end subroutine touch_file
 
 
