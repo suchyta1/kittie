@@ -26,6 +26,17 @@ else()
 	find_package(Python REQUIRED)
 endif()
 
+
+# Test Fortran compiler
+include(CheckFortranCompilerFlag)
+check_fortran_compiler_flag("-ffree-line-length-none" exists_gnu)
+if(exists_gnu)
+	set(fortran_free_flag "-ffree-line-length-none")
+#elseif(exists_pgi)
+#	set(fortran_free_flag "
+endif()
+
+
 # Add all the build files
 add_subdirectory(src)
 add_subdirectory(config)

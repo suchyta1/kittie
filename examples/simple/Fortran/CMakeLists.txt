@@ -1,7 +1,7 @@
 execute_process(COMMAND ${PROJECT_SOURCE_DIR}/util/kittie-cpp.py repo ${CMAKE_CURRENT_SOURCE_DIR} --tree-output=${CMAKE_CURRENT_BINARY_DIR})
 
 include_directories(${CMAKE_BINARY_DIR}/src/Fortran)
-add_definitions(-ffree-line-length-none)
+add_definitions(${fotran_free_flag})
 
 add_executable(writer ${CMAKE_CURRENT_BINARY_DIR}/writer-kittie.F90)
 target_link_libraries(writer kittie_f adios2::adios2_f)

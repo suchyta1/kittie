@@ -1,4 +1,4 @@
-add_definitions(-ffree-line-length-none)
+add_definitions(${fortran_free_flag})
 
 if(USE_MPI)
 	if(ADIOS2_VERSION LESS 2.4.0)
