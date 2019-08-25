@@ -597,6 +597,7 @@ class KittieJob(cheetah.Campaign):
             self.codesetup[lname]['path'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "plot", "login.py")
             self.codesetup[lname]['processes'] = 1
             self.codesetup[lname]['processes-per-node'] = 1
+            #self.codesetup[lname]['cpus-per-process'] = 1
             self.codesetup[lname][self.keywords['copy']] = []
             self.codesetup[lname][self.keywords['copycontents']] = []
             self.codesetup[lname][self.keywords['link']] = []
@@ -658,8 +659,16 @@ class KittieJob(cheetah.Campaign):
             # Set the node layout -- namely, it's different on summit
             if self.machine == 'summit':
                 self.node_layout[self.machine] += [SummitNode()]
+
                 for i in range(self.codesetup[codename]['processes-per-node']):
-                    self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
+                    if 'cpus-per-process' in self.codesetup[codename]:
+                        self.node_layout[self.machine][-1].cpu[i*self.codesetup[codename]['processes-per-node']] = "{0}:{1}".format(codename, i)
+                    else:
+                        self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
+
+                    if ('use-gpus' in self.codesetup[codename]) and self.codesetup[codename]['use-gpus']:
+                        self.node_layout[self.machine][-1].gpu[i] = "{0}:{1}".format(codename, i)
+
             else:
                 self.node_layout[self.machine] += [{codename: self.codesetup[codename]['processes-per-node']}]
 
