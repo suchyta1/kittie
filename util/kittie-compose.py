@@ -662,7 +662,8 @@ class KittieJob(cheetah.Campaign):
 
                 for i in range(self.codesetup[codename]['processes-per-node']):
                     if 'cpus-per-process' in self.codesetup[codename]:
-                        self.node_layout[self.machine][-1].cpu[i*self.codesetup[codename]['processes-per-node']] = "{0}:{1}".format(codename, i)
+                        for j in range(self.codesetup[codename]['cpus-per-process']):
+                            self.node_layout[self.machine][-1].cpu[i*self.codesetup[codename]['cpus-per-process'] + j] = "{0}:{1}".format(codename, i)
                     else:
                         self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
 
