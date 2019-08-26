@@ -668,7 +668,7 @@ class KittieJob(cheetah.Campaign):
                         self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
 
                     if ('use-gpus' in self.codesetup[codename]) and self.codesetup[codename]['use-gpus']:
-                        self.node_layout[self.machine][-1].gpu[i] = "{0}:{1}".format(codename, i)
+                        self.node_layout[self.machine][-1].gpu[i] = ["{0}:{1}".format(codename, i)]
 
             else:
                 self.node_layout[self.machine] += [{codename: self.codesetup[codename]['processes-per-node']}]
