@@ -38,7 +38,6 @@ module kittie
 	character(len=128), dimension(:), allocatable :: allreading
 	logical, dimension(:), allocatable :: readexists
 
-	! I don't think these things are needed
 	! These need to be read from files at startup
 	integer :: ngroupnames, ncodes, nnames, nGroupsSet
 	character(len=128), dimension(:), allocatable :: groupnames, codenames, names, engines
@@ -65,31 +64,6 @@ module kittie
 			allocate(groupnames(ngroupnames), helpers(ngroupnames))
 			nGroupsSet = 0
 		end subroutine SetMaxGroups
-
-
-		!subroutine kittie_read_helpers_file(filename)
-		!	character(len=*), intent(in) :: filename
-		!	character(len=128) :: appname
-		!	logical :: exists
-		!	namelist /setup/ ngroupnames, appname
-		!	namelist /helpers_list/ groupnames
-
-		!	inquire(file=trim(filename), exist=exists)
-		!	if (exists) then
-		!		open(unit=iounit, file=trim(filename), action='read')
-		!		read(iounit, nml=setup)
-		!		close(iounit)
-		!		allocate(groupnames(ngroupnames), helpers(ngroupnames))
-		!		open(unit=iounit, file=trim(filename), action='read')
-		!		read(iounit, nml=helpers_list)
-		!		close(iounit)
-		!	else
-		!		ngroupnames = 0
-		!		appname = "unknown"
-		!	end if
-		!	!app_name = string_copy(appname)
-
-		!end subroutine kittie_read_helpers_file
 
 
 		subroutine kittie_read_codes_file(filename)
@@ -541,6 +515,9 @@ module kittie
 					helper%opentime_a(1) = mpi_wtime()
 #				endif
 
+				if ((trim(helper%engine_type) == "BP4") .and. (helper%mode == adios2_mode_read)) then
+					call wait_data_existence(helper)
+				end if
 				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
 
 #				ifdef FINE_TIME
@@ -596,29 +573,6 @@ module kittie
 			end if
 
 		end subroutine kittie_finalize
-
-
-		!function setup_file() result(filename)
-		!	logical :: stripped
-		!	character(len=512) :: appfile
-		!	character(len=:), allocatable :: filename
-		!	integer :: i
-
-		!	stripped = .false.
-		!	call get_command_argument(0, appfile)
-		!	do i=len_trim(appfile), 1, -1
-		!		if (trim(appfile(i:i)) == '/') then
-		!			filename = string_copy(trim(appfile(1:i)) // ".kittie-setup.nml")
-		!			stripped = .true.
-		!			exit
-		!		end if
-		!	end do
-
-		!	if (.not.stripped) then
-		!		filename = string_copy(".kittie-setup.nml")
-		!	end if
-
-		!end function setup_file
 
 
 #		ifdef USE_MPI
@@ -836,13 +790,7 @@ module kittie
 		end subroutine kittie_open
 
 
-		!subroutine adios2_begin_step(engine, adios2_step_mode, timeout_seconds, status, ierr)
-		!subroutine kittie_couple_start(helper, step, ierr)
 		subroutine kittie_couple_start(helper, step, timeout, iostatus, ierr)
-
-			! Roughly the idea is push/fetch the given step, without worrying about how to do safely for different types of I/O.
-			! In detail, this is something of a combination of adios2_open() and adios2_begin_step() depending what engine type you're using.
-
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(in),  optional :: step
 			real(4), intent(in),  optional :: timeout
