@@ -416,12 +416,17 @@ module kittie
 		end subroutine kittie_couple_end_step
 
 
-		function which_engine(io) result(res)
+		function which_engine(io) result(ret)
 			type(adios2_io), intent(in) :: io
 			integer :: ierr
-			character(:), allocatable :: res
-
+			character(:), allocatable :: res, ret
 			res = capitalize(io%engine_type)
+			if ((trim(res) == 'BPFILE') .or. (trim(res) == 'BP') .or. (trim(res) == 'BP1') .or. (trim(res) == 'BP2') .or. (trim(res) == 'BP3')) then
+				ret = string_copy("BP4")
+			else
+				ret = string_copy(res)
+			end if
+			deallocate(res)
 		end function which_engine
 
 
@@ -430,7 +435,7 @@ module kittie
 			integer :: ierr
 			logical :: res
 
-			if ((trim(engine_type) == 'BPFILE') .or. (trim(engine_type) == 'BP') .or. (trim(engine_type) == 'BP3') .or. (trim(engine_type) == 'HDF5')) then
+			if (trim(engine_type) == 'HDF5') then
 				res = .true.
 			else
 				res = .false.
