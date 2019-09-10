@@ -40,6 +40,7 @@ module kittie
 
 	! These need to be read from files at startup
 	integer :: ngroupnames, ncodes, nnames, nGroupsSet
+	character(len=512) :: timingdir
 	character(len=128), dimension(:), allocatable :: groupnames, codenames, names, engines
 	character(len=256), dimension(:), allocatable :: kittie_filenames
 	character(len=128), dimension(:, :), allocatable :: params, values !, plots, 
@@ -52,7 +53,7 @@ module kittie
 	logical :: kittie_AllStep=.false.
 	type(adios2_io) :: kittie_StepIO
 	type(adios2_engine) :: kittie_StepEngine
-	logical, dimension(:), allocatable :: kittie_addstep
+	logical, dimension(:), allocatable :: kittie_addstep, kittie_timed
 	character(len=:), allocatable :: kittie_StepGroupname
 
 
@@ -120,8 +121,8 @@ module kittie
 			logical :: exists
 			integer :: maxsize, maxparams, i, ierr
 			type(adios2_io) :: io
-			namelist /ionames/ nnames
-			namelist /ionames_list/ names, engines, nparams, kittie_addstep, kittie_filenames !, nplots
+			namelist /ionames/ nnames, timingdir
+			namelist /ionames_list/ names, engines, nparams, kittie_addstep, kittie_filenames, kittie_timed !, nplots
 			namelist /params_list/ params, values
 			!namelist /plots_list/ plots
 
@@ -134,12 +135,14 @@ module kittie
 				close(iounit)
 
 				!allocate(names(nnames), engines(nnames), nplots(nnames), nparams(nnames))
-				allocate(names(nnames), engines(nnames), nparams(nnames), kittie_addstep(nnames), kittie_filenames(nnames))
+				allocate(names(nnames), engines(nnames), nparams(nnames), kittie_addstep(nnames), &
+					kittie_filenames(nnames), kittie_timed(nnames))
 				do i=1, nnames
 					engines(i) = ""
 					nparams(i) = 0
 					!nplots(i) = 0
 					kittie_addstep(i) = .false.
+					kittie_timed(i) = .false.
 					kittie_filenames(i) = ""
 				end do
 				open(unit=iounit, file=trim(filename), action='read')
@@ -703,14 +706,13 @@ module kittie
 		end function KittieDeclareIO
 
 
-		subroutine kittie_open(helper, groupname, filename, mode, comm, ierr, timefile)
+		subroutine kittie_open(helper, groupname, filename, mode, comm, ierr)
 			type(coupling_helper), intent(inout) :: helper
 			character(len=*), intent(in) :: groupname
 			character(len=*), intent(in) :: filename
 			integer, intent(in) :: mode
 			integer, intent(in),  optional :: comm
 			integer, intent(in),  optional :: ierr
-			character(len=*), intent(in), optional :: timefile
 
 			type(adios2_io) :: io, timingio
 			type(adios2_engine) :: engine
@@ -735,60 +737,65 @@ module kittie
 			end if
 
 
-			if (present(timefile) .and. use_mpi .and. .not.helper%alive) then
-				helper%timed = .true.
-				helper%timingfile = string_copy(timefile)
-				helper%timinggroup = string_copy(trim(groupname)//"-timing")
-
-				if (.not.helper%timeinit) then
-					call mpi_comm_size(helper%comm, comm_size, iierr)
-					gdims(1) = comm_size
-					offs(1)  = helper%rank
-					locs(1)  = 1
-
-					call adios2_declare_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
-					call adios2_define_variable(varid, helper%timingio, "start", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-					call adios2_define_variable(varid, helper%timingio, "end",   adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-					call adios2_define_variable(varid, helper%timingio, "other", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-					call adios2_define_variable(varid, helper%timingio, "total", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-
-#					ifdef FINE_TIME
-						call adios2_define_variable(helper%timingio, "adios2_open",       adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-						call adios2_define_variable(helper%timingio, "adios2_begin_step", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-						call adios2_define_variable(helper%timingio, "adios2_end_step",   adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
-#					endif
-
-					call adios2_at_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
-
-#					ifdef USE_MPI
-						call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, helper%comm, iierr)
-#					else
-						call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, iierr)
-#					endif
-
-					helper%timeinit = .true.
-				end if
-				helper%starttime(1) = mpi_wtime()
-				helper%totaltime(1) = mpi_wtime()
-			else
-				helper%timed = .false.
-			end if
-
-
 			if (.not.helper%fileopened) then
 				helper%io = io
 				helper%groupname = string_copy(trim(groupname))
 
 				helper%filename = string_copy(trim(filename))
 				do i=1, nnames
-					if (trim(helper%groupname) == trim(names(i)) .and. (kittie_filenames(i) /= "") ) then
-						helper%filename = string_copy(trim(kittie_filenames(i)))
-						exit
-					else
-						helper%filename = string_copy(trim(filename))
+
+					if (trim(helper%groupname) == trim(names(i))) then
+						if (kittie_filenames(i) /= "") then
+							helper%filename = string_copy(trim(kittie_filenames(i)))
+						else
+							helper%filename = string_copy(trim(filename))
+						end if
+
+						if (kittie_timed(i) .and. use_mpi .and. .not. helper%fileopened) then
+							helper%timed = .true.
+							helper%timingfile = string_copy(trim(timingdir)//"/"//trim(code_name)//trim(groupname)//".bp")
+							helper%timinggroup = string_copy(trim(groupname)//"-timing")
+
+							if (.not.helper%timeinit) then
+								call mpi_comm_size(helper%comm, comm_size, iierr)
+								gdims(1) = comm_size
+								offs(1)  = helper%rank
+								locs(1)  = 1
+
+								call adios2_declare_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
+								call adios2_define_variable(varid, helper%timingio, "start", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+								call adios2_define_variable(varid, helper%timingio, "end",   adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+								call adios2_define_variable(varid, helper%timingio, "other", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+								call adios2_define_variable(varid, helper%timingio, "total", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+
+#								ifdef FINE_TIME
+									call adios2_define_variable(helper%timingio, "adios2_open",       adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+									call adios2_define_variable(helper%timingio, "adios2_begin_step", adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+									call adios2_define_variable(helper%timingio, "adios2_end_step",   adios2_type_dp, 1, gdims, offs, locs, .true., iierr)
+#								endif
+
+								call adios2_at_io(helper%timingio, kittie_adios, trim(helper%timinggroup), iierr)
+
+#								ifdef USE_MPI
+									call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, helper%comm, iierr)
+#								else
+									call adios2_open(helper%timeengine, helper%timingio, helper%timingfile, adios2_mode_write, iierr)
+#								endif
+
+								helper%timeinit = .true.
+							end if
+							helper%starttime(1) = mpi_wtime()
+							helper%totaltime(1) = mpi_wtime()
+						else
+							helper%timed = .false.
+						end if
+
 					end if
 				end do
+			end if
 
+
+			if (.not.helper%fileopened) then
 				call kittie_couple_open(helper)
 			end if
 

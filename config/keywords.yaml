@@ -28,3 +28,4 @@ include: include
 mpmd: mpmd
 script: script
 login-proc: login-proc
+timed: timed

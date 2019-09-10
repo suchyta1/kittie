@@ -540,6 +540,7 @@ class KittieJob(cheetah.Campaign):
         """
 
 
+        self.timingdir = os.path.join(self.config[self.keywords['rundir']], 'effis-timing')
         for k, codename in enumerate(self.codenames):
             self.codesetup[codename]['groups'] = {}
             for key in self.codesetup[codename]:
@@ -548,6 +549,7 @@ class KittieJob(cheetah.Campaign):
                     entry = self.codesetup[codename][key]
                     self.codesetup[codename]['groups'][name] = self.codesetup[codename][key]
                     self.codesetup[codename]['groups'][name]['AddStep'] = False
+                    self.codesetup[codename]['groups'][name]['timingdir'] = self.timingdir
 
         # See if we're linking anything from other groups
         for k, codename in enumerate(self.codenames):
@@ -763,6 +765,7 @@ class KittieJob(cheetah.Campaign):
 
         os.chdir(self.mainpath)
         mainlist = os.listdir(self.mainpath)
+        os.makedirs(self.timingdir)
 
         if self.launchmode == "MPMD":
             linksrc = os.path.join(self.cheetahdir, self.cheetahsub)
@@ -803,7 +806,8 @@ class KittieJob(cheetah.Campaign):
             values = []
 
             keys = self.codesetup[codename]['groups'].keys()
-            names = ["ionames", "nnames = {0}".format(len(keys))]
+            names = ["ionames", "nnames = {0}".format(len(keys)) + "\n" + "timingdir = '{0}'".format(self.timingdir)]
+
             for i, key in enumerate(keys):
                 entry = self.codesetup[codename]['groups'][key]
                 gstr = "names({0}) = '{1}'".format(i+1, key)
@@ -811,6 +815,12 @@ class KittieJob(cheetah.Campaign):
 
                 if entry['AddStep']:
                     gstr = "{0}{1}kittie_addstep({2}) = T".format(gstr, '\n', i+1)
+
+                if (self.keywords['timed'] in entry) and (entry[self.keywords['timed']]):
+                    gstr = "{0}{1}kittie_timed({2}) = T".format(gstr, '\n', i+1)
+                else:
+                    gstr = "{0}{1}kittie_timed({2}) = F".format(gstr, '\n', i+1)
+
 
                 if 'filename' in entry:
                     gstr = "{0}{1}kittie_filenames({2}) = '{3}'".format(gstr, '\n', i+1, entry['filename'])
