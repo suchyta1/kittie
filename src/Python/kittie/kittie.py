@@ -412,3 +412,27 @@ class Kittie(object):
             cls.StepEngine.Put(vPhysical, cls.StepPhysical)
             cls.StepEngine.EndStep()
 
+
+def TimingRead(filename, comm=None):
+    if comm is not None:
+        adios = adios2.ADIOS(comm, adios2.DebugON)
+    else:
+        adios = adios2.ADIOS(adios2.DebugON)
+
+    TmpIO = adios.DeclareIO("tmp-{0}".format(filename))
+    TmpEngine = TmpIO.Open(filename, adios2.Mode.Read)
+    steps = TmpEngine.Steps()
+
+    data = {}
+    for name in ["start", "other", "end", "total"]:
+        var = TmpIO.InquireVariable(name)
+        shape = var.Shape()
+        var.SetSelection([[0], shape])
+        var.SetStepSelection([0, steps])
+        data[name] = np.zeros(shape[0])
+        TmpEngine.Get(var, data[name])
+
+    #TmpEngine.Flush()
+    TmpEngine.Close()
+    return data
+
