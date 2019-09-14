@@ -422,6 +422,7 @@ def TimingRead(filename, comm=None):
     TmpIO = adios.DeclareIO("tmp-{0}".format(filename))
     TmpEngine = TmpIO.Open(filename, adios2.Mode.Read)
     steps = TmpEngine.Steps()
+    print(steps)
 
     data = {}
     for name in ["start", "other", "end", "total"]:
@@ -429,7 +430,7 @@ def TimingRead(filename, comm=None):
         shape = var.Shape()
         var.SetSelection([[0], shape])
         var.SetStepSelection([0, steps])
-        data[name] = np.zeros(shape[0])
+        data[name] = np.zeros((steps, shape[0]))
         TmpEngine.Get(var, data[name])
 
     #TmpEngine.Flush()
