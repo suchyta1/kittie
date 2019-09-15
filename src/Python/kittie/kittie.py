@@ -422,7 +422,6 @@ def TimingRead(filename, comm=None):
     TmpIO = adios.DeclareIO("tmp-{0}".format(filename))
     TmpEngine = TmpIO.Open(filename, adios2.Mode.Read)
     steps = TmpEngine.Steps()
-    print(steps)
 
     data = {}
     for name in ["start", "other", "end", "total"]:
