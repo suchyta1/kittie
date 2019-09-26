@@ -198,13 +198,21 @@ module kittie
 			end do
 		end subroutine
 
-		subroutine wait_data_existence(helper)
+		subroutine wait_data_existence(helper, suffix)
 			type(coupling_helper), intent(in) :: helper
+			character(len=*), intent(in), optional :: suffix
 			logical :: exists
-			inquire(file=trim(helper%filename), exist=exists)
-			do while(.not.exists) 
+			if (present(suffix)) then
+				inquire(file=trim(helper%filename//trim(suffix)), exist=exists)
+				do while(.not.exists) 
+					inquire(file=trim(helper%filename//trim(suffix)), exist=exists)
+				end do
+			else
 				inquire(file=trim(helper%filename), exist=exists)
-			end do
+				do while(.not.exists) 
+					inquire(file=trim(helper%filename), exist=exists)
+				end do
+			endif
 		end subroutine wait_data_existence
 
 		subroutine rlock(rfile)
@@ -238,7 +246,11 @@ module kittie
 				call nothing_reading(helper)
 			else
 				rfile = trim(helper%filename) // myreading
-				call wait_data_existence(helper)
+				if ((trim(helper%engine_type) == "BP4") .and. (helper%mode == adios2_mode_read)) then
+					call wait_data_existence(helper, suffix="/md.idx")
+				else
+					call wait_data_existence(helper)
+				endif
 				call nothing_writing(wfile)
 				call rlock(rfile)
 
@@ -507,7 +519,7 @@ module kittie
 
 #			ifdef USE_MPI
 				if ((trim(helper%engine_type) == "BP4") .and. (helper%mode == adios2_mode_read)) then
-					call wait_data_existence(helper)
+					call wait_data_existence(helper, suffix="/md.idx")
 				end if
 				call adios2_open(helper%engine, helper%io, helper%filename, helper%mode, helper%comm, ierr)
 #			else
