@@ -70,6 +70,7 @@
 				void ReleaseLock();
 				void _CoupleOpen();
 				void _lockfile();
+				void WaitDataExistence();
 				void begin_write();
 				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=0.0);
 
@@ -92,6 +93,7 @@
 		extern std::string writing;
 		extern std::string reading;
 		extern std::vector<std::string> _FileMethods;
+		extern std::vector<std::string> _MetaMethods;
 		extern std::vector<std::string> allreading;
 		extern std::vector<std::string> groupnames;
 		extern std::map<std::string, Coupler*> Couplers;

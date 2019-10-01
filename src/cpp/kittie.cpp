@@ -37,6 +37,7 @@ std::string kittie::Codename;
 std::string kittie::writing = ".writing";
 std::string kittie::reading = ".reading";
 std::vector<std::string> kittie::_FileMethods {"bpfile", "bp", "bp3", "hdf5"};
+std::vector<std::string> kittie::_MetaMethods {"bpfile", "bp", "bp2", "bp3", "bp4", "hdf5"};
 std::vector<std::string> kittie::allreading;
 std::vector<std::string> kittie::groupnames;
 std::map<std::string, kittie::Coupler*> kittie::Couplers;
@@ -467,10 +468,10 @@ void kittie::Coupler::AcquireLock()
 	{
 		if (mode == adios2::Mode::Read)
 		{
-			while (! kittie::Exists(filename))
-			{
-				continue;
-			}
+			//while (! kittie::Exists(filename))
+			//{
+			//	continue;
+			//}
 			Until_Nonexistent_Read();
 		}
 		else if (mode == adios2::Mode::Write)
@@ -503,6 +504,12 @@ void kittie::Coupler::ReleaseLock()
 
 void kittie::Coupler::_CoupleOpen()
 {
+
+	if (mode == adios2::Mode::Read)
+	{
+		WaitDataExistence();
+	}
+
 	if (LockFile)
 	{
 		AcquireLock();
@@ -522,6 +529,19 @@ void kittie::Coupler::_CoupleOpen()
 	opened = true;
 }
 
+void kittie::Coupler::WaitDataExistence()
+{
+	std::string EngineType = io->EngineType();
+	std::transform(EngineType.begin(), EngineType.end(), EngineType.begin(), ::tolower);
+	bool wait = (std::find(kittie::_MetaMethods.begin(), kittie::_MetaMethods.end(), EngineType) != kittie::_MetaMethods.end());
+	if (wait)
+	{
+		while (! kittie::Exists(filename))
+		{
+			continue;
+		}
+	}
+}
 
 void kittie::Coupler::_lockfile()
 {
@@ -547,6 +567,7 @@ adios2::StepStatus kittie::Coupler::FileSeek(bool &found, const int step, const 
 	adios2::StepStatus status;
 	int current_step = -1;
 
+	WaitDataExistence();
 	AcquireLock();
 	if (!opened)
 	{
