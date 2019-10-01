@@ -1,4 +1,5 @@
 #include "kittie.h"
+#include "yaml-cpp/yaml.h"
 
 
 #ifndef USE_MPI
@@ -35,7 +36,7 @@ std::string kittie::myreading;
 std::string kittie::Codename;
 std::string kittie::writing = ".writing";
 std::string kittie::reading = ".reading";
-std::vector<std::string> kittie::_FileMethods;
+std::vector<std::string> kittie::_FileMethods {"bpfile", "bp", "bp3", "hdf5"};
 std::vector<std::string> kittie::allreading;
 std::vector<std::string> kittie::groupnames;
 std::map<std::string, kittie::Coupler*> kittie::Couplers;

@@ -12,8 +12,6 @@
 #	include <cstdio>
 #	include <adios2.h>
 
-#	include "yaml-cpp/yaml.h"
-
 
 #	ifdef USE_MPI
 #		include <mpi.h>

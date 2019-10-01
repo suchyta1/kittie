@@ -11,7 +11,14 @@ set(lib_objects ${CMAKE_CURRENT_SOURCE_DIR}/kittie.cpp)
 add_library(kittie ${lib_objects})
 
 target_link_libraries(kittie PRIVATE adios2::adios2 yaml::cpp)
-target_include_directories(kittie PUBLIC $<BUILD_INTERFACE:${YAML_INCLUDE_DIRS}> $<INSTALL_INTERFACE:${YAML_INCLUDE_DIRS}>)
+target_include_directories(kittie 
+	PUBLIC 
+	$<BUILD_INTERFACE:${YAML_INCLUDE_DIRS}>
+	$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
+	$<INSTALL_INTERFACE:${YAML_INCLUDE_DIRS}>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
+)
+#target_include_directories(kittie PRIVATE $<BUILD_INTERFACE:${YAML_INCLUDE_DIRS}> $<INSTALL_INTERFACE:${YAML_INCLUDE_DIRS}>)
 
 install(TARGETS kittie DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/kittie.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
