@@ -282,6 +282,7 @@ void kittie::write_step(double physical, int number)
 			adios2::Variable<int> VarNumber = io.DefineVariable<int>("StepNumber");
 			adios2::Variable<double> VarStep = io.DefineVariable<double>("StepPhysical");
 			io.SetEngine("SST");
+			io.SetParameter("MarshalMethod", "bp");
 			io.SetParameter("RendezvousReaderCount", "0");
 			io.SetParameter("QueueLimit", "1");
 			io.SetParameter("QueueFullPolicy", "Discard");

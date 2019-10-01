@@ -24,6 +24,7 @@ class Coupler(object):
         self.FindStep = False
         self.groupname = groupname
         self.lockfile = False
+        self.metafile = False
 
 
     def UntilNonexistentRead(self, verify=3):
@@ -61,13 +62,20 @@ class Coupler(object):
                 os.remove(self.reading)
 
 
+    def WaitDataExistence(self):
+        if self.metafile:
+            while not os.path.exists(self.filename):
+                continue
+
+
+
     def AcquireLock(self):
         if self.rank == 0:
             if self.mode == adios2.Mode.Write:
                 self.UntilNonexistentWrite()
             elif self.mode == adios2.Mode.Read:
-                while not os.path.exists(self.filename):
-                    continue
+                #while not os.path.exists(self.filename):
+                #    continue
                 self.UntilNonexistentRead()
 
         if self.comm is not None:
@@ -75,6 +83,9 @@ class Coupler(object):
 
 
     def CoupleOpen(self):
+        if self.mode == adios2.Mode.Read:
+            self.WaitDataExistence()
+
         if self.lockfile:
             self.AcquireLock()
         if self.comm is not None:
@@ -100,6 +111,8 @@ class Coupler(object):
 
             if self.io.EngineType().lower() in Kittie.FileMethods:
                 self.lockfile = True
+            if self.io.EngineType().lower() in Kittie.MetaMethods:
+                self.metafile = True
 
         if not self.opened:
             if (self.groupname in Kittie.YamlEngineSettings) and ('filename' in Kittie.YamlEngineSettings[self.groupname]):
@@ -118,6 +131,7 @@ class Coupler(object):
 
     def FileSeek(self, found, step, timeout):
         CurrentStep = -1
+        self.WaitDataExistence()
         self.AcquireLock()
         if not self.opened:
             if self.comm is not None:
@@ -232,6 +246,7 @@ class Kittie(object):
     # The namespace you init into
     adios = None
     FileMethods = ["bpfile", "bp", "bp3", "hdf5"]
+    MetaMethods = ["bpfile", "bp", "bp3", "bp4", "hdf5"]
 
     # Getting the list of all group names found in pre-processing doesn't seem to be needed
     #CompileGroups = []

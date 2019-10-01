@@ -202,6 +202,7 @@ class KittiePlotter(object):
             #@effis-begin StepGroup->StepGroup
             self.StepIO = adios.DeclareIO(StepGroup)
             self.StepIO.SetEngine("SST")
+            self.StepIO.SetParameter("MarshalMethod", "BP")
             self.StepIO.SetParameter("RendezvousReaderCount", "0")
             self.StepIO.SetParameter("QueueLimit", "1")
             self.StepIO.SetParameter("QueueFullPolicy", "Discard")
