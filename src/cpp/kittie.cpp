@@ -668,7 +668,7 @@ adios2::StepStatus kittie::Coupler::begin_step(const int step, const double time
 			while (!found)
 			{
 				status = FileSeek(found, step, timeout);
-				if (timeout > 0)
+				if (timeout > -1.0)
 				{
 					break;
 				}

@@ -55,8 +55,8 @@
 
 
 				// Methods
-				adios2::StepStatus begin_step(const int step, const double timeout=0.0);
-				adios2::StepStatus begin_step(const double timeout=0.0);
+				adios2::StepStatus begin_step(const int step, const double timeout=-1.0);
+				adios2::StepStatus begin_step(const double timeout=-1.0);
 				void end_step();
 				void close();
 				void finalize();
@@ -72,7 +72,7 @@
 				void _lockfile();
 				void WaitDataExistence();
 				void begin_write();
-				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=0.0);
+				adios2::StepStatus FileSeek(bool &found, const int step, const double timeout=-1.0);
 
 				// @effis-timestep
 				void AddStep();

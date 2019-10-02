@@ -838,7 +838,7 @@ module kittie
 					found = .false.
 					do while (.not.found)
 						found = file_seek(helper, istep, ftimeout, fstatus)
-						if (ftimeout > 0) then
+						if (ftimeout > -1.0) then
 							exit
 						end if
 					end do

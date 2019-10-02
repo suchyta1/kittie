@@ -88,10 +88,12 @@ class Coupler(object):
 
         if self.lockfile:
             self.AcquireLock()
+
         if self.comm is not None:
             self.engine = self.io.Open(self.filename, self.mode, self.comm)
         else:
             self.engine = self.io.Open(self.filename, self.mode)
+
         if self.lockfile:
             self.ReleaseLock()
         self.opened = True
@@ -167,7 +169,8 @@ class Coupler(object):
         return status, found
 
 
-    def begin_step(self, step=None, timeout=0.0):
+    #def begin_step(self, step=None, timeout=0.0):
+    def begin_step(self, step=None, timeout=-1):
         found = False
 
         if self.mode == adios2.Mode.Write:
@@ -185,7 +188,7 @@ class Coupler(object):
             if self.lockfile:
                 while not found:
                     status, found = self.FileSeek(found, usestep, timeout)
-                    if (timeout > 0):
+                    if (timeout > -1.0):
                         break
             else:
                 if not self.opened:
@@ -377,17 +380,17 @@ class Kittie(object):
 
     @classmethod
     def declare_io(cls, groupname):
-        io = cls.adios.DeclareIO(groupname)
         cls.Couplers[groupname] = Coupler(groupname)
+        cls.Couplers[groupname].io = cls.adios.DeclareIO(groupname)
         if groupname in cls.YamlEngineSettings:
             entry = cls.YamlEngineSettings[groupname]
             if 'engine' in entry:
-                io.SetEngine(entry['engine'])
+                cls.Couplers[groupname].io.SetEngine(entry['engine'])
             if 'params' in entry:
                 for key in entry['params']:
-                    io.SetParameter(key, entry['params'][key])
-        cls.Couplers[groupname].io = io
-        return io
+                    cls.Couplers[groupname].io.SetParameter(key, str(entry['params'][key]))
+        #cls.Couplers[groupname].io = io
+        return cls.Couplers[groupname].io
 
 
     @classmethod

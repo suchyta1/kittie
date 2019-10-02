@@ -582,6 +582,8 @@ class KittieJob(cheetah.Campaign):
                     #self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
                     if 'engine' in other:
                         self.codesetup[codename]['groups'][key]['engine'] = self.codesetup[code]['groups'][group]['engine']
+                    if 'params' in other:
+                        self.codesetup[codename]['groups'][key]['params'] = self.codesetup[code]['groups'][group]['params']
 
                     self.codesetup[code]['groups'][group]['AddStep'] = True
                     #self.codesetup[codename]['groups'][key]['FromApp'] = code +

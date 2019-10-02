@@ -253,11 +253,16 @@ class KittiePlotter(object):
         #@effis-begin self.gname->self.gname
         self.io = adios.DeclareIO(self.gname)
         if self.rank == 0:
-            self.engine = self.io.Open(self.gname, adios2.Mode.Read, MPI.COMM_SELF)
+            self.engine = self.io.Open(self.gname, adios2.Mode.Read, MPI.COMM_WORLD)
+            self.engine.BeginStep(kittie.Kittie.ReadStepMode, -1.0)
+            self.io = kittie.Kittie.adios.AtIO(self.gname)
+            vvv = self.io.AvailableVariables()
+            #try:
             if y == "match-dimensions":
                 self._GetSelections(xaxis, exclude=exclude, only=only, xomit=xomit)
             else:
                 xstart, xcount, xname, xtype, ystart, ycount, yname, ytype = self._GetExplicit(xaxis, y)
+
             self.engine.Close()
             self.io.RemoveAllVariables()
             self.io.RemoveAllAttributes()
