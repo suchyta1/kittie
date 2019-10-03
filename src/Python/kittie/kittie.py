@@ -232,6 +232,7 @@ class Coupler(object):
         if self.opened:
             if (self.mode == adios2.Mode.Write) and self.lockfile:
                 self.AcquireLock()
+            print(self.groupname)
             self.engine.Close()
             self.opened = False
             if (self.mode == adios2.Mode.Write) and self.lockfile:
@@ -362,15 +363,19 @@ class Kittie(object):
     @classmethod
     def Finalize(cls):
         for name in cls.Couplers.keys():
+            print(name)
             filename = cls.Couplers[name].filename + ".done"
             cls.Couplers[name].close()
             if (cls.rank == 0) and (cls.Couplers[name].mode == adios2.Mode.Write):
                 filename = cls.Touch(filename)
+            print(name, "done")
 
         if cls.StepInit:
+            print("Step")
             with open(cls.StepGroupname + ".done", "w") as outfile:
                 outfile.write("{0}".format(Kittie.StepNumber[0]))
             cls.StepEngine.Close()
+            print("Step done")
 
 
 

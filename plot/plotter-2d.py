@@ -37,7 +37,6 @@ def Plot(data, outdir, fs=20, xname="x", yname="y", cmap="bwr", minmax=False, in
             inits[name] = False
 
         if not inits[name]:
-            print(name)
             gs[name] = gridspec.GridSpec(1, 1)
             fig[name] = plt.figure(figsize=(7,6), tight_layout=True)
             ax[name] = fig[name].add_subplot(gs[name][0, 0])

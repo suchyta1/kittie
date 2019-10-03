@@ -208,8 +208,10 @@ class KittiePlotter(object):
             self.StepIO.SetParameter("QueueFullPolicy", "Discard")
             if not(os.path.exists(self.LastStepFile)):
                 self.StepEngine = self.StepIO.Open(StepFile, adios2.Mode.Read, MPI.COMM_SELF)
+                self.StepOpen = True
             else:
                 self.SteppingDone = True
+                self.StepOpen = False
             #@effis-end
 
         self.LastFoundData = np.array([-1], dtype=np.int64)
@@ -253,11 +255,9 @@ class KittiePlotter(object):
         #@effis-begin self.gname->self.gname
         self.io = adios.DeclareIO(self.gname)
         if self.rank == 0:
-            self.engine = self.io.Open(self.gname, adios2.Mode.Read, MPI.COMM_WORLD)
+            self.engine = self.io.Open(self.gname, adios2.Mode.Read, MPI.COMM_SELF)
             self.engine.BeginStep(kittie.Kittie.ReadStepMode, -1.0)
             self.io = kittie.Kittie.adios.AtIO(self.gname)
-            vvv = self.io.AvailableVariables()
-            #try:
             if y == "match-dimensions":
                 self._GetSelections(xaxis, exclude=exclude, only=only, xomit=xomit)
             else:
@@ -302,6 +302,7 @@ class KittiePlotter(object):
     def _CheckStepFile(self):
         NewStep = False
         if not self.SteppingDone:
+            #@effis-begin self.StepEngine--->"StepInfo"
             StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.1)
             if StepStatus == adios2.StepStatus.EndOfStream:
                 self.SteppingDone = True
@@ -315,6 +316,7 @@ class KittiePlotter(object):
                 pass
             else:
                 raise ValueError("Something weird happened reading the step information")
+            #@effis-end
         return NewStep
 
 
@@ -356,6 +358,11 @@ class KittiePlotter(object):
                     self.DoneEngine.Put(self.vDone, np.array([last], dtype=np.int64))
                     self.DoneEngine.EndStep()
                     #@effis-end
+
+                """
+                if self.StepOpen:
+                    self.StepEngine.Close()
+                """
 
             self.DoPlot = False
             return False

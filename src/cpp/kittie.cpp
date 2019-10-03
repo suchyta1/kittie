@@ -242,10 +242,13 @@ void kittie::_yaml_setup()
 
 void kittie::finalize() 
 {
+	std::cout << "Closing EFFIS" << std::endl;
+
 	for(std::map<std::string, kittie::Coupler*>::iterator it=kittie::Couplers.begin(); it!=kittie::Couplers.end(); ++it)
 	{
 		if (it->second->mode == adios2::Mode::Write)
 		{
+
 			std::string fname = it->second->filename + ".done";
 			it->second->close();
 			if (kittie::rank == 0)
@@ -261,8 +264,10 @@ void kittie::finalize()
 		outfile.open(kittie::StepGroupname + ".done");
 		outfile << kittie::_StepNumber;
 		outfile.close();
-		kittie::StepEngine.Close();
+
+		//kittie::StepEngine.Close();
 	}
+	std::cout << "EFFIS clossed" << std::endl;
 
 	delete kittie::adios;
 }
