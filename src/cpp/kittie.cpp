@@ -265,7 +265,7 @@ void kittie::finalize()
 		outfile << kittie::_StepNumber;
 		outfile.close();
 
-		//kittie::StepEngine.Close();
+		kittie::StepEngine.Close();
 	}
 	std::cout << "EFFIS clossed" << std::endl;
 
