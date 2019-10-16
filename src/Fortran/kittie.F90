@@ -308,16 +308,27 @@ module kittie
 
 		end subroutine lock_state
 
-		subroutine kittie_close(helper, iierr)
+		subroutine kittie_close(helper, iierr, closed)
 			type(coupling_helper), intent(inout) :: helper
 			integer, intent(out), optional :: iierr
+			logical, intent(in), optional :: closed
+			logical :: doclose
 			integer :: ierr
+
+			if (present(closed) .and. closed) then
+				doclose = .false.
+			else
+				doclose = .true.
+			end if
 
 			if (helper%fileopened) then
 				if (helper%usesfile) then
 					call lock_state(helper, .true.)
 				end if
-				call adios2_close(helper%engine, ierr)
+
+				if (doclose) then
+					call adios2_close(helper%engine, ierr)
+				end if
 				helper%fileopened = .false.
 				if (helper%usesfile) then
 					call lock_state(helper, .false.)
@@ -546,7 +557,7 @@ module kittie
 				else
 					do j=1, size(closed)
 						if (trim(helpers(i)%groupname) == trim(closed(i))) then
-							call kittie_close(helpers(i), ierr)
+							call kittie_close(helpers(i), ierr, closed=.true.)
 							exit
 						end if
 					end do
