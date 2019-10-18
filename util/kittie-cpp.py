@@ -1025,6 +1025,7 @@ if __name__ == "__main__":
     RepoParser.add_argument("-s", "--suffix", help="String to append to file names when replaced", type=str, default="-kittie")
     RepoParser.add_argument("-k", "--skip", help="Groups to skip", type=str, default="")
     RepoParser.add_argument("-o", "--only", help="Groups to keep", type=str, default="")
+    RepoParser.add_argument("-a", "--tar", help="Tar source", action="store_true", default=False)
     #RepoParser.add_argument("-c", "--confdir",     help="Output directory where the configuration file writes", type=str, default=None)
     #RepoParser.add_argument("-n", "--name", help="Name IDing the app", type=str, default=None)
     RepoParser.set_defaults(which='repo')
@@ -1068,10 +1069,11 @@ if __name__ == "__main__":
             args.confdir = args.directory
         """
 
-        if args.tree_output is not None:
-            Tar(args.directory, args.tree_output)
-        else:
-            Tar(args.directory, args.directory)
+        if args.tar:
+            if args.tree_output is not None:
+                Tar(args.directory, args.tree_output)
+            else:
+                Tar(args.directory, args.directory)
 
         groupnames = []
         BlockFinders = [FortranBlocks(), CppBlocks(), PythonBlocks()]
