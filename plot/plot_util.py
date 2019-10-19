@@ -49,9 +49,10 @@ def ShapeParse(xShape, xsel):
 
 class KittiePlotter(object):
     
-    def __init__(self, comm):
+    def __init__(self, comm, on=False):
         self.comm = comm
         self.rank = self.comm.Get_rank()
+        self.on = on
 
         yamlfile = ".kittie-groups-" + os.environ["KITTIE_NUM"] + ".yaml"
         with open(yamlfile, 'r') as ystream:
@@ -190,7 +191,7 @@ class KittiePlotter(object):
         else:
             self.gname = group
 
-        if self.rank == 0:
+        if (self.rank == 0) and self.on:
             self.SteppingDone = False
             self.StepEngine = None
             self.code, self.group = self.config[self.gname]['reads'].strip().split('.', 1)
@@ -218,7 +219,7 @@ class KittiePlotter(object):
         self.LastFoundSim  = np.array([-1], dtype=np.int64)
         self.SecondLastFoundSim  = np.array([-1], dtype=np.int64)
 
-        if self.rank == 0:
+        if (self.rank == 0) and self.on:
 
             yamlfile = ".kittie-codenames-" + os.environ["KITTIE_NUM"] + ".yaml"
             with open(yamlfile, 'r') as ystream:
@@ -325,7 +326,7 @@ class KittiePlotter(object):
     def NotDone(self):
         NewStep = False
 
-        if (self.rank == 0) and (not self.SteppingDone):
+        if self.on and (self.rank == 0) and (not self.SteppingDone):
             NewStep = self._CheckStepFile()
 
         #self.ReadComm.Barrier()
@@ -336,7 +337,7 @@ class KittiePlotter(object):
         self.DoPlot = True
 
         if ReadStatus == adios2.StepStatus.NotReady:
-            if (self.rank == 0) and NewStep and (self.SecondLastFoundSim[0] > self.LastFoundData[0]):
+            if self.on and (self.rank == 0) and NewStep and (self.SecondLastFoundSim[0] > self.LastFoundData[0]):
                 #@effis-begin self.DoneEngine--->"done"
                 self.DoneEngine.BeginStep()
                 self.DoneEngine.Put(self.vDone, self.SecondLastFoundSim)
@@ -345,7 +346,7 @@ class KittiePlotter(object):
             self.DoPlot = False
 
         elif ReadStatus != adios2.StepStatus.OK:
-            if (self.rank == 0):
+            if (self.rank == 0) and self.on:
                 while not os.path.exists(self.LastStepFile):
                     continue
                 #time.sleep(1)
@@ -359,10 +360,10 @@ class KittiePlotter(object):
                     self.DoneEngine.EndStep()
                     #@effis-end
 
-                """
+            """
                 if self.StepOpen:
                     self.StepEngine.Close()
-                """
+            """
 
             self.DoPlot = False
             return False
@@ -417,7 +418,7 @@ class KittiePlotter(object):
 
     def StepDone(self):
         self.ReadComm.Barrier()
-        if self.rank == 0:
+        if self.on and (self.rank == 0):
             #@effis-begin self.DoneEngine--->"done"
             self.DoneEngine.BeginStep()
             self.DoneEngine.Put(self.vDone, self.LastFoundData)

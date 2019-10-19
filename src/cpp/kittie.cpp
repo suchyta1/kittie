@@ -242,7 +242,6 @@ void kittie::_yaml_setup()
 
 void kittie::finalize() 
 {
-	std::cout << "Closing EFFIS" << std::endl;
 
 	for(std::map<std::string, kittie::Coupler*>::iterator it=kittie::Couplers.begin(); it!=kittie::Couplers.end(); ++it)
 	{
@@ -267,7 +266,6 @@ void kittie::finalize()
 
 		//kittie::StepEngine.Close();
 	}
-	std::cout << "EFFIS clossed" << std::endl;
 
 	delete kittie::adios;
 }

@@ -91,6 +91,7 @@ def ParseArgs():
     parser.add_argument("-c", "--colormap", help="Colormap to use", type=str, default="bwr")
     parser.add_argument("-t", "--type", help="Image file and/or interactive", type=str, default="image", choices=["image", "interactive", "both"])
     parser.add_argument("-x", "--ext", help="Image extension", type=str, default="svg", choices=["svg", "png"])
+    parser.add_argument("-d", "--dashboard", help="Using dashboard", action="store_true", default=False)
 
     args = parser.parse_args()
 
@@ -109,7 +110,7 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
     adios = adios2.ADIOS(comm)
-    plotter = plot_util.KittiePlotter(comm)
+    plotter = plot_util.KittiePlotter(comm, on=args.dashboard)
     plotter.ConnectToStepInfo(adios, group="plotter")
     plotter.GetMatchingSelections(adios, args.gridvar, exclude=args.exclude, only=args.only, xomit=False, allx=False)
 
