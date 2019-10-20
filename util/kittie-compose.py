@@ -69,6 +69,19 @@ class KittieJob(cheetah.Campaign):
         for key in config.keys():
             self.keywords[key] = config[key]
 
+        if 'args' not in self.keywords.keys():
+            self.keywords['args'] = 'args'
+        if 'options' not in self.keywords.keys():
+            self.keywords['options'] = 'options'
+        if 'path' not in self.keywords.keys():
+            self.keywords['path'] = 'path'
+        if 'filename' not in self.keywords.keys():
+            self.keywords['filename'] = 'filename'
+        if 'engine' not in self.keywords.keys():
+            self.keywords['engine'] = 'engine'
+        if 'params' not in self.keywords.keys():
+            self.keywords['params'] = 'params'
+
 
     def _SetIfNotFound(self, dictionary, keyword, value=None, level=logging.INFO):
         """
@@ -157,14 +170,18 @@ class KittieJob(cheetah.Campaign):
 
         self.codesetup = dict(self.config['run'])
         self.codenames = list(self.codesetup.keys())
-        self.codescope_list = allscopes_list + ['args']
+
+        self.codescope_list = allscopes_list + [self.keywords['args']]
+
         #self.codescope_list = allscopes_list + ['args', 'options']
         #self.codescope_dict = allscopes_dict + ['groups']
-        self.codescope_dict = allscopes_dict + ['options']
+        self.codescope_dict = allscopes_dict + [self.keywords['options']]
         for codename in self.codenames:
             self._BlankInit(self.codescope_dict, self.codesetup[codename], {})
             self._BlankInit(self.codescope_list, self.codesetup[codename], [])
             self._SetIfNotFound(self.codesetup[codename], 'scheduler_args', value=None, level=logging.INFO)
+            self._SetIfNotFound(self.codesetup[codename], 'processes', value=1, level=logging.INFO)
+            self._SetIfNotFound(self.codesetup[codename], 'processes-per-node', value=1, level=logging.INFO)
 
 
     def _Unmatched(self, match):
@@ -540,6 +557,36 @@ class KittieJob(cheetah.Campaign):
         """
 
 
+        # Insert ADIOS-based names Scott wants
+        for k, codename in enumerate(self.codenames):
+            thisdir = os.path.dirname(os.path.realpath(__file__))
+            updir = os.path.dirname(thisdir)
+
+            if (codename == "plot-colormap"):
+                self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-2d.py")
+                if "only" in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]["only"]]
+                    self.codesetup[codename][self.keywords['options']]["only"] = self.codesetup[codename]["only"]
+                elif "match-dimensions" in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]["match-dimensions"]]
+                if "data" in self.codesetup[codename]:
+                    self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
+
+                if 'colortype' in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['options']]["colormap"] = self.codesetup[codename]["colortype"]
+                if 'viewtype' in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['options']]["type"] = self.codesetup[codename]["viewtype"]
+
+            if (codename == "plot-1D"):
+                self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-1d.py")
+                if "x" in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]['x']]
+                if "y" in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['options']]['y'] = self.codesetup[codename]['y']
+                if "data" in self.codesetup[codename]:
+                    self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
+
+
         self.timingdir = os.path.join(self.config[self.keywords['rundir']], 'effis-timing')
         for k, codename in enumerate(self.codenames):
             self.codesetup[codename]['groups'] = {}
@@ -551,8 +598,24 @@ class KittieJob(cheetah.Campaign):
                     self.codesetup[codename]['groups'][name]['AddStep'] = False
                     self.codesetup[codename]['groups'][name]['timingdir'] = self.timingdir
 
+
+        # Insert ADIOS-based names Scott wants
+        for k, codename in enumerate(self.codenames):
+            for key in self.codesetup[codename]['groups']:
+                entry = self.codesetup[codename]['groups'][key]
+
+                if self.keywords['filename'] in entry:
+                    self.codesetup[codename]['groups'][key]['filename'] = entry[self.keywords['filename']]
+                if self.keywords['engine'] in entry:
+                    self.codesetup[codename]['groups'][key]['engine'] = entry[self.keywords['engine']]
+                if self.keywords['params'] in entry:
+                    self.codesetup[codename]['groups'][key]['params'] = entry[self.keywords['params']]
+
+
+
         # See if we're linking anything from other groups
         for k, codename in enumerate(self.codenames):
+
             for key in self.codesetup[codename]['groups']:
                 entry = self.codesetup[codename]['groups'][key]
 
@@ -595,10 +658,10 @@ class KittieJob(cheetah.Campaign):
             uselogin = True
             self.codenames += [lname]
             self.codesetup[lname] = {}
-            self.codesetup[lname]['args'] = []
+            self.codesetup[lname][self.keywords['args']] = []
             self.codesetup[lname]['scheduler_args'] = None
-            self.codesetup[lname]['options'] = {}
-            self.codesetup[lname]['path'] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "plot", "login.py")
+            self.codesetup[lname][self.keywords['options']] = {}
+            self.codesetup[lname][self.keywords['path']] = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "plot", "login.py")
             self.codesetup[lname]['processes'] = 1
             self.codesetup[lname]['processes-per-node'] = 1
             #self.codesetup[lname]['cpus-per-process'] = 1
@@ -633,16 +696,15 @@ class KittieJob(cheetah.Campaign):
 
 
         for k, codename in enumerate(self.codenames):
-
             codedict = {}
-            codedict['exe'] = self.codesetup[codename]['path']
+            codedict['exe'] = self.codesetup[codename][self.keywords['path']]
             
             # Added in node-layout branch
             if codename == lname:
                 codedict['runner_override'] = True
 
             self.codes.append((codename, codedict))
-            self.codesetup[codename]['setup-file'] = os.path.join(os.path.dirname(self.codesetup[codename]['path']), ".kittie-setup.nml")
+            self.codesetup[codename]['setup-file'] = os.path.join(os.path.dirname(self.codesetup[codename][self.keywords['path']]), ".kittie-setup.nml")
 
             """
             if codename != "kittie-plotter":
@@ -679,12 +741,12 @@ class KittieJob(cheetah.Campaign):
 
 
             # Set the command line arguments
-            args = self.codesetup[codename]['args']
+            args = self.codesetup[codename][self.keywords['args']]
             for i, arg in enumerate(args):
                 sweepargs += [cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])]
 
             # Set the command line options
-            options = dict(self.codesetup[codename]['options'])
+            options = dict(self.codesetup[codename][self.keywords['options']])
             for i, option in enumerate(options.keys()):
                 sweepargs += [cheetah.parameters.ParamCmdLineOption(codename, "opt{0}".format(i), "--{0}".format(option), [options[option]])]
 
@@ -696,7 +758,7 @@ class KittieJob(cheetah.Campaign):
                 sweepargs += [cheetah.parameters.ParamSchedulerArgs(codename, [dict(self.codesetup[codename][self.keywords['scheduler_args']])])]
 
 
-            exedir = os.path.dirname(self.codesetup[codename]['path'])
+            exedir = os.path.dirname(self.codesetup[codename][self.keywords['path']])
             sweepenv1 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-yaml', 'KITTIE_YAML_FILE', [os.path.join(exedir, ".kittie-setup.yaml")])
             sweepenv2 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-nml',  'KITTIE_NML_FILE',  [os.path.join(exedir, ".kittie-setup.nml" )])
             sweepenv3 = cheetah.parameters.ParamEnvVar(codename, 'setup-file-num',  'KITTIE_NUM', ['{0}'.format(k)])
@@ -828,8 +890,8 @@ class KittieJob(cheetah.Campaign):
                     gstr = "{0}{1}kittie_filenames({2}) = '{3}'".format(gstr, '\n', i+1, entry['filename'])
 
 
-                if "engine" in entry:
-                    engine = entry["engine"]
+                if 'engine' in entry:
+                    engine = entry['engine']
                     if type(engine) is str:
                         gstr = "{0}{1}engines({2}) = '{3}'".format(gstr, '\n', i+1, engine)
                     elif type(engine) is OrderedDict:
