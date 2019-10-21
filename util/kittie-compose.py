@@ -605,7 +605,14 @@ class KittieJob(cheetah.Campaign):
                 entry = self.codesetup[codename]['groups'][key]
 
                 if self.keywords['filename'] in entry:
-                    self.codesetup[codename]['groups'][key]['filename'] = entry[self.keywords['filename']]
+                    fname = entry[self.keywords['filename']]
+                    if not fname.startswith('/'):
+                        if self.launchmode != "MPMD":
+                            fname = os.path.join(self.mainpath, code, fname)
+                        else:
+                            fname = os.path.join(self.mainpath, fname)
+                    self.codesetup[codename]['groups'][key]['filename'] = fname
+
                 if self.keywords['engine'] in entry:
                     self.codesetup[codename]['groups'][key]['engine'] = entry[self.keywords['engine']]
                 if self.keywords['params'] in entry:
