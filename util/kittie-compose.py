@@ -608,7 +608,7 @@ class KittieJob(cheetah.Campaign):
                     fname = entry[self.keywords['filename']]
                     if not fname.startswith('/'):
                         if self.launchmode != "MPMD":
-                            fname = os.path.join(self.mainpath, code, fname)
+                            fname = os.path.join(self.mainpath, codename, fname)
                         else:
                             fname = os.path.join(self.mainpath, fname)
                     self.codesetup[codename]['groups'][key]['filename'] = fname
