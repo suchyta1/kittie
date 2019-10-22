@@ -63,9 +63,8 @@ class Coupler(object):
 
 
     def WaitDataExistence(self):
-        print(self.metafile, self.filename)
         if self.metafile:
-            while not os.path.exists(self.filename):
+            while not os.path.exists(os.path.join(self.filename, 'md.idx')):
                 continue
 
 
@@ -84,7 +83,6 @@ class Coupler(object):
 
 
     def CoupleOpen(self):
-        print(self.mode)
         if self.mode == adios2.Mode.Read:
             self.WaitDataExistence()
 
