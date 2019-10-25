@@ -69,18 +69,9 @@ class KittieJob(cheetah.Campaign):
         for key in config.keys():
             self.keywords[key] = config[key]
 
-        if 'args' not in self.keywords.keys():
-            self.keywords['args'] = 'args'
-        if 'options' not in self.keywords.keys():
-            self.keywords['options'] = 'options'
-        if 'path' not in self.keywords.keys():
-            self.keywords['path'] = 'path'
-        if 'filename' not in self.keywords.keys():
-            self.keywords['filename'] = 'filename'
-        if 'engine' not in self.keywords.keys():
-            self.keywords['engine'] = 'engine'
-        if 'params' not in self.keywords.keys():
-            self.keywords['params'] = 'params'
+        for name in ['args', 'options', 'path', 'filename', 'engine', 'params', 'processes', 'processes-per-node']:
+            if name not in self.keywords.keys():
+                self.keywords[name] = name
 
 
     def _SetIfNotFound(self, dictionary, keyword, value=None, level=logging.INFO):
