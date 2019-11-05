@@ -40,3 +40,4 @@ params: adios_engine_params
 processes: processes
 processes-per-node: processes-per-node
 
+use-dashboard: use-dashboard

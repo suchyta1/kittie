@@ -142,6 +142,7 @@ class KittieJob(cheetah.Campaign):
         self._SetIfNotFound(self.config, 'rundir',  'kittie-run', level=logging.WARNING)
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
 
+        self._SetIfNotFound(self.config, 'use-dashboard', False, level=logging.INFO)
         self._SetIfNotFound(self.config, 'login-proc', {}, level=logging.INFO)
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job', level=logging.INFO)
         self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
@@ -556,10 +557,10 @@ class KittieJob(cheetah.Campaign):
             if (codename == "plot-colormap"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-2d.py")
                 if "only" in self.codesetup[codename]:
-                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]["only"]]
+                    self.codesetup[codename][self.keywords['args']] += [self.codesetup[codename]["only"]]
                     self.codesetup[codename][self.keywords['options']]["only"] = self.codesetup[codename]["only"]
                 elif "match-dimensions" in self.codesetup[codename]:
-                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]["match-dimensions"]]
+                    self.codesetup[codename][self.keywords['args']] += [self.codesetup[codename]["match-dimensions"]]
                 if "data" in self.codesetup[codename]:
                     self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
 
@@ -568,15 +569,28 @@ class KittieJob(cheetah.Campaign):
                 if 'viewtype' in self.codesetup[codename]:
                     self.codesetup[codename][self.keywords['options']]["type"] = self.codesetup[codename]["viewtype"]
 
+                if self.config['use-dashboard']:
+                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
+                """
+                else:
+                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'off'
+                """
+
             if (codename == "plot-1D"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-1d.py")
                 if "x" in self.codesetup[codename]:
-                    self.codesetup[codename][self.keywords['args']] = [self.codesetup[codename]['x']]
+                    self.codesetup[codename][self.keywords['args']] += [self.codesetup[codename]['x']]
                 if "y" in self.codesetup[codename]:
                     self.codesetup[codename][self.keywords['options']]['y'] = self.codesetup[codename]['y']
                 if "data" in self.codesetup[codename]:
                     self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
 
+                if self.config['use-dashboard']:
+                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
+                """
+                else:
+                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'off'
+                """
 
         self.timingdir = os.path.join(self.config[self.keywords['rundir']], 'effis-timing')
         for k, codename in enumerate(self.codenames):
@@ -741,6 +755,7 @@ class KittieJob(cheetah.Campaign):
             # Set the command line arguments
             args = self.codesetup[codename][self.keywords['args']]
             for i, arg in enumerate(args):
+                print(i, arg)
                 sweepargs += [cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])]
 
             # Set the command line options

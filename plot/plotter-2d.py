@@ -8,6 +8,7 @@ import os
 import sys
 import numpy as np
 import plot_util
+import sys
 
 # I'm going to require MPI with this, it's more or less required to do anything else real
 from mpi4py import MPI
@@ -91,7 +92,7 @@ def ParseArgs():
     parser.add_argument("-c", "--colormap", help="Colormap to use", type=str, default="bwr")
     parser.add_argument("-t", "--type", help="Image file and/or interactive", type=str, default="image", choices=["image", "interactive", "both"])
     parser.add_argument("-x", "--ext", help="Image extension", type=str, default="svg", choices=["svg", "png"])
-    parser.add_argument("-d", "--dashboard", help="Using dashboard", action="store_true", default=False)
+    parser.add_argument("-d", "--use-dashboard", help="Using dashboard", type=str, default="off")
 
     args = parser.parse_args()
 
@@ -99,6 +100,11 @@ def ParseArgs():
         args.only = args.only.split(',')
     if len(args.exclude) > 0:
         args.exclude = args.exclude.split(',')
+
+    if args.use_dashboard.lower() in ["on", "yes", "true"]:
+        args.use_dashboard = True
+    else:
+        args.use_dashboard = False
 
     return args
 
@@ -110,7 +116,7 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
     adios = adios2.ADIOS(comm)
-    plotter = plot_util.KittiePlotter(comm, on=args.dashboard)
+    plotter = plot_util.KittiePlotter(comm, on=args.use_dashboard)
     plotter.ConnectToStepInfo(adios, group="plotter")
     plotter.GetMatchingSelections(adios, args.gridvar, exclude=args.exclude, only=args.only, xomit=False, allx=False)
 
@@ -119,6 +125,7 @@ if __name__ == "__main__":
         if args.type != "image":
             plt.ion()
 
+        print("E"); sys.stdout.flush()
         while plotter.NotDone:
 
             if plotter.DoPlot:

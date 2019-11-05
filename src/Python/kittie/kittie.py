@@ -194,7 +194,9 @@ class Coupler(object):
                 if not self.opened:
                     self.CoupleOpen()
 
+                print("begin", timeout); sys.stdout.flush()
                 status = self.engine.BeginStep(Kittie.ReadStepMode, timeout)
+                print("end begin"); sys.stdout.flush()
 
         self.BegunStepping = True
         return status
@@ -363,6 +365,7 @@ class Kittie(object):
     def Finalize(cls):
         for name in cls.Couplers.keys():
             filename = cls.Couplers[name].filename + ".done"
+            print(name, filename)
             cls.Couplers[name].close()
             if (cls.rank == 0) and (cls.Couplers[name].mode == adios2.Mode.Write):
                 filename = cls.Touch(filename)

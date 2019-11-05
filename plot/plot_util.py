@@ -304,7 +304,9 @@ class KittiePlotter(object):
         NewStep = False
         if not self.SteppingDone:
             #@effis-begin self.StepEngine--->"StepInfo"
-            StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.1)
+            print("E.1.1"); sys.stdout.flush()
+            StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
+            print("E.1.2", StepStatus); sys.stdout.flush()
             if StepStatus == adios2.StepStatus.EndOfStream:
                 self.SteppingDone = True
             elif StepStatus == adios2.StepStatus.OK:
@@ -315,7 +317,10 @@ class KittiePlotter(object):
                 self.StepEngine.EndStep()
             elif StepStatus == adios2.StepStatus.NotReady:
                 pass
+            elif StepStatus == adios2.StepStatus.OtherError:
+                StepStatus = adios2.StepStatus.EndOfStream
             else:
+                print(StepStatus)
                 raise ValueError("Something weird happened reading the step information")
             #@effis-end
         return NewStep
@@ -331,9 +336,10 @@ class KittiePlotter(object):
 
         #self.ReadComm.Barrier()
         #@effis-begin self.engine--->"plotter"
-        ReadStatus = self.engine.BeginStep(kittie.Kittie.ReadStepMode, 1.0)
+        ReadStatus = self.engine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
         #@effis-end
 
+        print(ReadStatus)
         self.DoPlot = True
 
         if ReadStatus == adios2.StepStatus.NotReady:

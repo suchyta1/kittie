@@ -264,7 +264,7 @@ void kittie::finalize()
 		outfile << kittie::_StepNumber;
 		outfile.close();
 
-		//kittie::StepEngine.Close();
+		kittie::StepEngine.Close();
 	}
 
 	delete kittie::adios;
@@ -520,7 +520,17 @@ void kittie::Coupler::_CoupleOpen()
 	}
 
 #	ifdef USE_MPI
+	if (mode == adios2::Mode::Read)
+	{
+		std::cout << "READ" << std::endl;
+	}
+	else
+	{
+		std::cout << "WRITE" << std::endl;
+	}
+		std::cout << "Open " << filename << std::endl;
 		engine = io->Open(filename, mode, comm);
+		std::cout << "Done open" << std::endl;
 #	else
 		engine = io->Open(filename, mode);
 #	endif
