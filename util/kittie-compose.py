@@ -592,6 +592,18 @@ class KittieJob(cheetah.Campaign):
                     self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'off'
                 """
 
+        for codename in self.codenames:
+            StepGroup = codename + "-step"
+            groupname = "." + StepGroup
+            if groupname not in self.codesetup[codename].keys():
+                self.codesetup[codename][groupname] = {}
+                self.codesetup[codename][groupname][self.keywords['engine']] = 'SST'
+                self.codesetup[codename][groupname][self.keywords['params']] = {}
+                self.codesetup[codename][groupname][self.keywords['params']]["RendezvousReaderCount"] = 0
+                self.codesetup[codename][groupname][self.keywords['params']]["QueueLimit"] = 1
+                self.codesetup[codename][groupname][self.keywords['params']]["QueueFullPolicy"] = "Discard"
+
+
         self.timingdir = os.path.join(self.config[self.keywords['rundir']], 'effis-timing')
         for k, codename in enumerate(self.codenames):
             self.codesetup[codename]['groups'] = {}
