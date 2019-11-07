@@ -597,7 +597,7 @@ class KittieJob(cheetah.Campaign):
             groupname = "." + StepGroup
             if groupname not in self.codesetup[codename].keys():
                 self.codesetup[codename][groupname] = {}
-                self.codesetup[codename][groupname][self.keywords['engine']] = 'SST'
+                self.codesetup[codename][groupname][self.keywords['engine']] = 'BP4'
                 self.codesetup[codename][groupname][self.keywords['params']] = {}
                 self.codesetup[codename][groupname][self.keywords['params']]["RendezvousReaderCount"] = 0
                 self.codesetup[codename][groupname][self.keywords['params']]["QueueLimit"] = 1
@@ -767,7 +767,6 @@ class KittieJob(cheetah.Campaign):
             # Set the command line arguments
             args = self.codesetup[codename][self.keywords['args']]
             for i, arg in enumerate(args):
-                print(i, arg)
                 sweepargs += [cheetah.parameters.ParamCmdLineArg(codename, "arg{0}".format(i+1), i+1, [arg])]
 
             # Set the command line options

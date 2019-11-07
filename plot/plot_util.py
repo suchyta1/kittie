@@ -186,27 +186,36 @@ class KittiePlotter(object):
 
 
     def ConnectToStepInfo(self, adios, group=None):
+
         if group is None:
             self.gname = list(self.config.keys())[0]
         else:
             self.gname = group
 
+
         if (self.rank == 0) and self.on:
+            yamlfile = ".kittie-codenames-" + os.environ["KITTIE_NUM"] + ".yaml"
+            with open(yamlfile, 'r') as ystream:
+                codeconfig = yaml.load(ystream)
+            appname = codeconfig['codename']
+            self.StepGroup = appname + "-step"
+            StepFile = self.config[self.gname]['stepfile']
+            self.LastStepFile = StepFile + ".done"
+
             self.SteppingDone = False
             self.StepEngine = None
             self.code, self.group = self.config[self.gname]['reads'].strip().split('.', 1)
 
-            StepGroup = "StepInfo"
-            StepFile = self.config[self.gname]['stepfile']
-            self.LastStepFile = StepFile + ".done"
 
-            #@effis-begin StepGroup->StepGroup
-            self.StepIO = adios.DeclareIO(StepGroup)
+            #@effis-begin self.StepGroup->self.StepGroup
+            self.StepIO = adios.DeclareIO(self.StepGroup)
+            """
             self.StepIO.SetEngine("SST")
             self.StepIO.SetParameter("MarshalMethod", "BP")
             self.StepIO.SetParameter("RendezvousReaderCount", "0")
             self.StepIO.SetParameter("QueueLimit", "1")
             self.StepIO.SetParameter("QueueFullPolicy", "Discard")
+            """
             if not(os.path.exists(self.LastStepFile)):
                 self.StepEngine = self.StepIO.Open(StepFile, adios2.Mode.Read, MPI.COMM_SELF)
                 self.StepOpen = True
@@ -220,11 +229,6 @@ class KittiePlotter(object):
         self.SecondLastFoundSim  = np.array([-1], dtype=np.int64)
 
         if (self.rank == 0) and self.on:
-
-            yamlfile = ".kittie-codenames-" + os.environ["KITTIE_NUM"] + ".yaml"
-            with open(yamlfile, 'r') as ystream:
-                codeconfig = yaml.load(ystream)
-            appname = codeconfig['codename']
 
             #@effis-begin "done"->"done"
             self.DoneIO = adios.DeclareIO("done")
@@ -302,26 +306,32 @@ class KittiePlotter(object):
 
     def _CheckStepFile(self):
         NewStep = False
+
         if not self.SteppingDone:
-            #@effis-begin self.StepEngine--->"StepInfo"
-            print("E.1.1"); sys.stdout.flush()
-            StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
-            print("E.1.2", StepStatus); sys.stdout.flush()
+
+            StepStatus = adios2.StepStatus.OK
+            #@effis-begin self.StepEngine--->self.StepGroup
+
+            while True:
+                StepStatus = self.StepEngine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
+
+                if (StepStatus == adios2.StepStatus.OK):
+                    NewStep = True
+                    self.SecondLastFoundSim[0] = self.LastFoundSim[0]
+                    varid = self.StepIO.InquireVariable("StepNumber")
+                    self.StepEngine.Get(varid, self.LastFoundSim)
+                    self.StepEngine.EndStep()
+                else:
+                    break
+
             if StepStatus == adios2.StepStatus.EndOfStream:
                 self.SteppingDone = True
-            elif StepStatus == adios2.StepStatus.OK:
-                NewStep = True
-                self.SecondLastFoundSim[0] = self.LastFoundSim[0]
-                varid = self.StepIO.InquireVariable("StepNumber")
-                self.StepEngine.Get(varid, self.LastFoundSim)
-                self.StepEngine.EndStep()
-            elif StepStatus == adios2.StepStatus.NotReady:
-                pass
             elif StepStatus == adios2.StepStatus.OtherError:
                 StepStatus = adios2.StepStatus.EndOfStream
-            else:
+            elif StepStatus != adios2.StepStatus.NotReady:
                 print(StepStatus)
                 raise ValueError("Something weird happened reading the step information")
+
             #@effis-end
         return NewStep
 
@@ -334,12 +344,10 @@ class KittiePlotter(object):
         if self.on and (self.rank == 0) and (not self.SteppingDone):
             NewStep = self._CheckStepFile()
 
-        #self.ReadComm.Barrier()
         #@effis-begin self.engine--->"plotter"
         ReadStatus = self.engine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
         #@effis-end
 
-        print(ReadStatus)
         self.DoPlot = True
 
         if ReadStatus == adios2.StepStatus.NotReady:
@@ -355,7 +363,6 @@ class KittiePlotter(object):
             if (self.rank == 0) and self.on:
                 while not os.path.exists(self.LastStepFile):
                     continue
-                #time.sleep(1)
                 with open(self.LastStepFile, 'r') as infile:
                     text = infile.read()
                 last = int(text.strip())

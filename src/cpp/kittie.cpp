@@ -281,14 +281,15 @@ void kittie::write_step(double physical, int number)
 
 		if (!kittie::stepinit)
 		{
-			adios2::IO io = kittie::adios->DeclareIO(kittie::StepGroupname);
+			//adios2::IO io = kittie::adios->DeclareIO(kittie::StepGroupname);
+			adios2::IO io = kittie::declare_io(kittie::StepGroupname);
 			adios2::Variable<int> VarNumber = io.DefineVariable<int>("StepNumber");
 			adios2::Variable<double> VarStep = io.DefineVariable<double>("StepPhysical");
-			io.SetEngine("SST");
-			io.SetParameter("MarshalMethod", "bp");
-			io.SetParameter("RendezvousReaderCount", "0");
-			io.SetParameter("QueueLimit", "1");
-			io.SetParameter("QueueFullPolicy", "Discard");
+			//io.SetEngine("SST");
+			//io.SetParameter("MarshalMethod", "bp");
+			//io.SetParameter("RendezvousReaderCount", "0");
+			//io.SetParameter("QueueLimit", "1");
+			//io.SetParameter("QueueFullPolicy", "Discard");
 
 #			ifdef USE_MPI
 				kittie::StepEngine = io.Open(kittie::StepGroupname, adios2::Mode::Write, MPI_COMM_SELF);
@@ -520,17 +521,7 @@ void kittie::Coupler::_CoupleOpen()
 	}
 
 #	ifdef USE_MPI
-	if (mode == adios2::Mode::Read)
-	{
-		std::cout << "READ" << std::endl;
-	}
-	else
-	{
-		std::cout << "WRITE" << std::endl;
-	}
-		std::cout << "Open " << filename << std::endl;
 		engine = io->Open(filename, mode, comm);
-		std::cout << "Done open" << std::endl;
 #	else
 		engine = io->Open(filename, mode);
 #	endif

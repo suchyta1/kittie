@@ -903,10 +903,10 @@ module kittie
 					call adios2_declare_io(kittie_StepIO, kittie_adios, trim(kittie_StepGroupname), ierr)
 					call adios2_define_variable(varid, kittie_StepIO, "StepNumber",   adios2_type_integer4, ierr)
 					call adios2_define_variable(varid, kittie_StepIO, "StepPhysical", adios2_type_dp,       ierr)
-					call adios2_set_engine(kittie_StepIO, "SST", ierr)
-					call adios2_set_parameter(kittie_StepIO, "RendezvousReaderCount", "0", ierr)
-					call adios2_set_parameter(kittie_StepIO, "QueueLimit", "1", ierr)
-					call adios2_set_parameter(kittie_StepIO, "QueueFullPolicy", "Discard", ierr)
+					!call adios2_set_engine(kittie_StepIO, "SST", ierr)
+					!call adios2_set_parameter(kittie_StepIO, "RendezvousReaderCount", "0", ierr)
+					!call adios2_set_parameter(kittie_StepIO, "QueueLimit", "1", ierr)
+					!call adios2_set_parameter(kittie_StepIO, "QueueFullPolicy", "Discard", ierr)
 
 #					ifdef USE_MPI
 						call adios2_open(kittie_StepEngine, kittie_StepIO, trim(kittie_StepGroupname), adios2_mode_write, mpi_comm_self, ierr)

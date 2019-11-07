@@ -45,13 +45,18 @@ def ParseArgs():
     parser.add_argument("-o", "--only",     help="Only plot the given y-values", type=str, default=[])
     parser.add_argument("-e", "--exclude", help="Don't plot the given y-values", type=str, default=[])
     parser.add_argument("-y", "--y", help="How to generate Y-value(s)", type=str, default="match-dimensions")
-    parser.add_argument("-d", "--dashboard", help="Using dashboard", action="store_true", default=False)
+    parser.add_argument("-d", "--use-dashboard", help="Using dashboard", type=str, default="off")
     args = parser.parse_args()
 
     if len(args.only) > 0:
         args.only = args.only.split(',')
     if len(args.exclude) > 0:
         args.exclude = args.exclude.split(',')
+
+    if args.use_dashboard.lower() in ["on", "yes", "true"]:
+        args.use_dashboard = True
+    else:
+        args.use_dashboard = False
 
     return args
 
@@ -64,7 +69,7 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
     adios = adios2.ADIOS(comm)
-    plotter = plot_util.KittiePlotter(comm, on=args.dashboard)
+    plotter = plot_util.KittiePlotter(comm, on=args.use_dashboard)
     plotter.ConnectToStepInfo(adios, group="plotter")
     plotter.GetMatchingSelections(adios, args.xaxis, exclude=args.exclude, only=args.only, xomit=True, y=args.y)
 
