@@ -143,7 +143,9 @@ class KittieJob(cheetah.Campaign):
         self.config[self.keywords['rundir']] = os.path.realpath(self.config[self.keywords['rundir']])
 
         self._SetIfNotFound(self.config, 'use-dashboard', False, level=logging.INFO)
+        self._SetIfNotFound(self.config, 'dashboard', {}, level=logging.INFO)
         self._SetIfNotFound(self.config, 'login-proc', {}, level=logging.INFO)
+
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job', level=logging.INFO)
         self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
 
@@ -547,7 +549,10 @@ class KittieJob(cheetah.Campaign):
             self._BlankInit(self.codescope_list, self.codesetup['kittie-plotter'], [])
             self._SetIfNotFound(self.codesetup['kittie-plotter'], 'scheduler_args', value=None, level=logging.INFO)
         """
-
+        
+        self.stepinfo = {}
+        lname = self.keywords['login-proc']
+        uselogin = False
 
         # Insert ADIOS-based names Scott wants
         for k, codename in enumerate(self.codenames):
@@ -569,12 +574,13 @@ class KittieJob(cheetah.Campaign):
                 if 'viewtype' in self.codesetup[codename]:
                     self.codesetup[codename][self.keywords['options']]["type"] = self.codesetup[codename]["viewtype"]
 
-                if self.config['use-dashboard']:
+                if ('use' in self.config[self.keywords['dashboard']]) and (self.config[self.keywords['dashboard']]['use']):
                     self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
-                """
-                else:
-                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'off'
-                """
+                    """
+                    if not uselogin:
+                        self.config[lname] = self.config[self.keywords['dashboard']]
+                        uselogin = True
+                    """
 
             if (codename == "plot-1D"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-1d.py")
@@ -585,12 +591,13 @@ class KittieJob(cheetah.Campaign):
                 if "data" in self.codesetup[codename]:
                     self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
 
-                if self.config['use-dashboard']:
+                if ('use' in self.config[self.keywords['dashboard']]) and (self.config[self.keywords['dashboard']]['use']):
                     self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
-                """
-                else:
-                    self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'off'
-                """
+                    """
+                    if not uselogin:
+                        self.config[lname] = self.config[self.keywords['dashboard']]
+                        uselogin = True
+                    """
 
         for codename in self.codenames:
             StepGroup = codename + "-step"
@@ -675,9 +682,7 @@ class KittieJob(cheetah.Campaign):
                     self.codesetup[code]['groups'][group]['AddStep'] = True
                     #self.codesetup[codename]['groups'][key]['FromApp'] = code +
 
-        self.stepinfo = {}
-        lname = self.keywords['login-proc']
-        uselogin = False
+
         if ('use' in self.config[lname]) and self.config[lname]['use']:
             uselogin = True
             self.codenames += [lname]

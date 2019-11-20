@@ -125,7 +125,6 @@ if __name__ == "__main__":
         if args.type != "image":
             plt.ion()
 
-        print("E"); sys.stdout.flush()
         while plotter.NotDone:
 
             if plotter.DoPlot:
