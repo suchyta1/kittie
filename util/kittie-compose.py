@@ -576,11 +576,9 @@ class KittieJob(cheetah.Campaign):
 
                 if ('use' in self.config[self.keywords['dashboard']]) and (self.config[self.keywords['dashboard']]['use']):
                     self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
-                    """
                     if not uselogin:
                         self.config[lname] = self.config[self.keywords['dashboard']]
                         uselogin = True
-                    """
 
             if (codename == "plot-1D"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-1d.py")
@@ -593,11 +591,9 @@ class KittieJob(cheetah.Campaign):
 
                 if ('use' in self.config[self.keywords['dashboard']]) and (self.config[self.keywords['dashboard']]['use']):
                     self.codesetup[codename][self.keywords['options']]['use-dashboard'] = 'on'
-                    """
                     if not uselogin:
                         self.config[lname] = self.config[self.keywords['dashboard']]
                         uselogin = True
-                    """
 
         for codename in self.codenames:
             StepGroup = codename + "-step"
