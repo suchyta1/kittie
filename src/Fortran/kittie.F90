@@ -909,9 +909,9 @@ module kittie
 					!call adios2_set_parameter(kittie_StepIO, "QueueFullPolicy", "Discard", ierr)
 
 #					ifdef USE_MPI
-						call adios2_open(kittie_StepEngine, kittie_StepIO, trim(kittie_StepGroupname), adios2_mode_write, mpi_comm_self, ierr)
+						call adios2_open(kittie_StepEngine, kittie_StepIO, trim(kittie_StepGroupname)//".bp", adios2_mode_write, mpi_comm_self, ierr)
 #					else
-						call adios2_open(kittie_StepEngine, kittie_StepIO, kittie_StepGroupname, adios2_mode_write, ierr)
+						call adios2_open(kittie_StepEngine, kittie_StepIO, trim(kittie_StepGroupname)//".bp", adios2_mode_write, ierr)
 #					endif
 
 					kittie_StepInit = .true.

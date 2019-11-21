@@ -667,7 +667,7 @@ class KittieJob(cheetah.Campaign):
                         self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
 
                     if self.launchmode != "MPMD":
-                        self.codesetup[codename]['groups'][key]['stepfile'] = os.path.join(self.mainpath, code, code + '-step')
+                        self.codesetup[codename]['groups'][key]['stepfile'] = os.path.join(self.mainpath, code, code + '-step.bp')
 
                     #self.codesetup[codename]['groups'][key]['filename'] = self.codesetup[code]['groups'][group]['filename']
                     if 'engine' in other:

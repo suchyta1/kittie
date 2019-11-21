@@ -292,9 +292,9 @@ void kittie::write_step(double physical, int number)
 			//io.SetParameter("QueueFullPolicy", "Discard");
 
 #			ifdef USE_MPI
-				kittie::StepEngine = io.Open(kittie::StepGroupname, adios2::Mode::Write, MPI_COMM_SELF);
+				kittie::StepEngine = io.Open(kittie::StepGroupname + ".bp", adios2::Mode::Write, MPI_COMM_SELF);
 #			else
-				kittie::StepEngine = io.Open(kittie::StepGroupname, adios2::Mode::Write);
+				kittie::StepEngine = io.Open(kittie::StepGroupname + ".bp", adios2::Mode::Write);
 #			endif
 
 			kittie::stepinit = true;

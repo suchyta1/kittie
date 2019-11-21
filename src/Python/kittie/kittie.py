@@ -420,9 +420,9 @@ class Kittie(object):
                 cls.StepIO.SetParameter("QueueFullPolicy", "Discard")
                 """
                 if cls.comm_self is None:
-                    cls.StepEngine = cls.StepIO.Open(cls.StepGroupname, adios2.Mode.Write)
+                    cls.StepEngine = cls.StepIO.Open(cls.StepGroupname + ".bp", adios2.Mode.Write)
                 else:
-                    cls.StepEngine = cls.StepIO.Open(cls.StepGroupname, adios2.Mode.Write, cls.comm_self)
+                    cls.StepEngine = cls.StepIO.Open(cls.StepGroupname + ".bp", adios2.Mode.Write, cls.comm_self)
                 cls.StepInit = True
 
             cls.StepEngine.BeginStep()
