@@ -200,7 +200,7 @@ class KittiePlotter(object):
             appname = codeconfig['codename']
             self.StepGroup = appname + "-step"
             StepFile = self.config[self.gname]['stepfile']
-            self.LastStepFile = StepFile + ".done"
+            self.LastStepFile = StepFile[:-3] + ".done"
 
             self.SteppingDone = False
             self.StepEngine = None
@@ -363,8 +363,10 @@ class KittiePlotter(object):
 
         elif ReadStatus != adios2.StepStatus.OK:
             if (self.rank == 0) and self.on:
+                print(self.LastStepFile); sys.stdout.flush()
                 while not os.path.exists(self.LastStepFile):
                     continue
+                print("found", self.LastStepFile); sys.stdout.flush()
                 with open(self.LastStepFile, 'r') as infile:
                     text = infile.read()
                 last = int(text.strip())
