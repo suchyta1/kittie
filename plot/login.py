@@ -108,6 +108,7 @@ if __name__ == "__main__":
     for name in config.keys():
         setup[name] = {}
         setup[name]['io'] = adios.DeclareIO(name)
+        setup[name]['io'].SetEngine('BP4')
         setup[name]['opened'] = False
         setup[name]['LastStep'] = np.array([-1], dtype=np.int64)
         setup[name]['done'] = False

@@ -232,6 +232,7 @@ class KittiePlotter(object):
 
             #@effis-begin "done"->"done"
             self.DoneIO = adios.DeclareIO("done")
+            self.DoneIO.SetEngine('BP4')
             self.vDone = self.DoneIO.DefineVariable("Step",  self.LastFoundSim,  [], [], [])
             name = "{0}-{1}-StepsDone.bp".format(appname, self.group)
             self.DoneEngine = self.DoneIO.Open(name, adios2.Mode.Write, MPI.COMM_SELF)
