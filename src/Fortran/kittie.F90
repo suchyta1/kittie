@@ -550,17 +550,26 @@ module kittie
 			integer, intent(out), optional :: iierr
 			character(len=*), dimension(:), intent(in), optional :: closed
 			integer :: i, j, rank, ierr
+			logical :: wasclosed
 
+			wasclosed = .false.
 			do i=1, size(helpers)
 				if (.not.present(closed)) then
 					call kittie_close(helpers(i), ierr)
 				else
+
 					do j=1, size(closed)
-						if (trim(helpers(i)%groupname) == trim(closed(i))) then
+						if (trim(helpers(i)%filename) == trim(closed(j))) then
 							call kittie_close(helpers(i), ierr, closed=.true.)
+							wasclosed = .true.
 							exit
 						end if
 					end do
+
+					if (.not.wasclosed) then
+						call kittie_close(helpers(i), ierr)
+					end if
+
 				end if
 
 				if ((helpers(i)%rank == 0) .and. (helpers(i)%mode == adios2_mode_write)) then

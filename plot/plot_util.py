@@ -346,6 +346,7 @@ class KittiePlotter(object):
 
         #@effis-begin self.engine--->"plotter"
         ReadStatus = self.engine.BeginStep(kittie.Kittie.ReadStepMode, 0.0)
+        print(ReadStatus); sys.stdout.flush()
         #@effis-end
 
         self.DoPlot = True
