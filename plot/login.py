@@ -117,6 +117,10 @@ if __name__ == "__main__":
     while True:
 
         if setup['done'] == setup['size']:
+            timedict['complete'] = True
+            timestr = json.dumps(timedict, indent=indent)
+            with open(timefile, 'w') as outfile:
+                outfile.write(timestr)
             break
 
         for name in config.keys():
@@ -206,7 +210,7 @@ if __name__ == "__main__":
                     subprocess.call(['tar', 'cfz', tarfile, "images/"])
 
                 timedict['current'] = i
-                timedict['complete'] = True
+                #timedict['complete'] = True
                 timestr = json.dumps(timedict, indent=indent)
                 with open(timefile, 'w') as outfile:
                     outfile.write(timestr)
