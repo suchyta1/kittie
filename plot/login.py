@@ -25,7 +25,7 @@ def IndexJSON(config, indent=4):
     indexfile = os.path.join(httpdir, 'index.json')
     rundir = os.path.join(httpdir, outdict['shot_name'], outdict['run_name'])
     timefile = os.path.join(rundir, "time.json")
-    timedict = {"current": 0, "complete": False}
+    timedict = {"current": 0, "complete": False, "started": False}
 
     if not os.path.exists(rundir):
         os.makedirs(rundir)
@@ -47,26 +47,6 @@ def IndexJSON(config, indent=4):
     return timefile, timedict
 
 
-"""
-def IndexJSON(config, rundir, timefile, indexfile, indent=4):
-    if not os.path.exists(rundir):
-        os.makedirs(rundir)
-        timestr = json.dumps(timedict, indent=indent)
-        with open(timefile, 'w') as outfile:
-            outfile.write(timestr)
-
-    if os.path.exists(indexfile):
-        with open(indexfile, mode='rb+') as infile:
-            infile.seek(0,  2)
-            infile.seek(-2, 1)
-            infile.write(','.encode('utf-8'))
-            outstr = outstr[1:-1] + '\n]'
-            infile.write(outstr.encode('utf-8'))
-    else:
-        with open(indexfile, mode='w') as outfile:
-            outfile.write(outstr)
-"""
-
 
 if __name__ == "__main__":
 
@@ -77,22 +57,6 @@ if __name__ == "__main__":
 
     timefile, timedict = IndexJSON(config, indent=indent)
     del config['login']
-
-    """
-    outdict = {}
-    login = config['login']
-    del config['login']
-    for name in ['shot_name', 'run_name', 'username', 'machine_name', 'date']:
-        outdict[name] = login[name]
-    outstr = json.dumps([outdict], indent=indent)
-
-    httpdir = login['http']
-    indexfile = os.path.join(httpdir, 'index.json')
-    rundir = os.path.join(httpdir, login['shot_name'], login['run_name'])
-    timefile = os.path.join(rundir, "time.json")
-    timedict = {"current": 0, "complete": False}
-    IndexWritten = False
-    """
 
 
     #@effis-init comm=None
@@ -162,13 +126,6 @@ if __name__ == "__main__":
 
         if check == setup['size']:
 
-            """
-            if not IndexWritten:
-                timedict = {"current": setup['LastStep']+1, "complete": False}
-                timefile, timedict = IndexJSON(config, rundir, timefile, indexfile, indent=indent)
-                IndexWritten = True
-            """
-
             for i in range(setup['LastStep']+1, minfound+1):
                 print("Done: ", i); sys.stdout.flush()
 
@@ -210,7 +167,7 @@ if __name__ == "__main__":
                     subprocess.call(['tar', 'cfz', tarfile, "images/"])
 
                 timedict['current'] = i
-                #timedict['complete'] = True
+                timedict['started'] = True
                 timestr = json.dumps(timedict, indent=indent)
                 with open(timefile, 'w') as outfile:
                     outfile.write(timestr)
