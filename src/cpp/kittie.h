@@ -79,6 +79,25 @@
 		};
 
 
+		class Timer
+		{
+			public:
+				adios2::IO io;
+				adios2::Engine engine;
+				double start;
+				double stop;
+				Timer();
+		};
+	
+		extern std::string timingdir;	
+		extern std::map<std::string, Timer*> Timers;
+		void stop_timer(std::string name);
+		void start_timer(std::string name);
+#		ifdef USE_MPI
+			void start_timer(std::string name, MPI_Comm comm);
+#		endif
+
+
 		// MPI
 		extern bool mpi;
 		extern MPI_Comm comm;

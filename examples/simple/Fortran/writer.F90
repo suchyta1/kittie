@@ -39,6 +39,8 @@ program writer
 	call adios2_open(engine, io, "Jabberwocky.bp", adios2_mode_write, comm, ierr)
 
 	do i=1, 10
+        !@effis-timer start="LoopTimer", comm=comm
+
 		call random_number(RandomReals)
 		call random_number(RandomReals2)
 
@@ -49,6 +51,8 @@ program writer
 		call adios2_put(engine, "RandomReals2", RandomReals2, ierr)
 		call adios2_end_step(engine, ierr)
 		call sleep(1)
+
+        !@effis-timer stop="LoopTimer"
 	end do
 
 	call adios2_close(engine, ierr)

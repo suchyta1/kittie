@@ -14,6 +14,7 @@ import yaml
 import subprocess
 import yaml
 import numpy as np
+import warnings
 
 
 class Coupler(object):
@@ -258,6 +259,7 @@ class Kittie(object):
     StepGroups = []
     AllReading = []
     Couplers = {}
+    Timers = {}
 
     if OldStep:
         ReadStepMode = adios2.StepMode.NextAvailable
@@ -302,11 +304,12 @@ class Kittie(object):
 
     @classmethod
     def GroupsYaml(cls):
-        #yamlfile = ".kittie-groups-" + cls.appname + ".yaml"
         yamlfile = ".kittie-groups-" + os.environ["KITTIE_NUM"] + ".yaml"
         if os.path.exists(yamlfile):
             with open(yamlfile, 'r') as ystream:
                 cls.YamlEngineSettings = yaml.load(ystream)
+            cls.timingdir = cls.YamlEngineSettings['.timingdir']
+            del cls.YamlEngineSettings['.timingdir']
             for name in cls.YamlEngineSettings:
                 if cls.YamlEngineSettings[name]["AddStep"]:
                     cls.StepGroups += [name]
@@ -431,6 +434,52 @@ class Kittie(object):
             cls.StepEngine.Put(vNumber, cls.StepNumber)
             cls.StepEngine.Put(vPhysical, cls.StepPhysical)
             cls.StepEngine.EndStep()
+
+
+    @classmethod
+    def start_timer(cls, name, comm=None):
+        if name not in cls.Timers:
+            cls.Timers[name] = {}
+            firstgroup = list(cls.YamlEngineSettings.keys())[0]
+            timefile = os.path.join(cls.timingdir, "{0}.bp".format(name))
+            cls.Timers[name]['diff'] = np.zeros(1)
+
+            cls.Timers[name]['io'] = cls.adios.DeclareIO(name)
+            if (comm is None) and (cls.comm is not None):
+                comm = cls.comm
+
+            if comm is not None:
+                from mpi4py import MPI
+                cls.Wtime = MPI.Wtime
+                rank = comm.Get_rank()
+                size = comm.Get_size()
+                cls.Timers[name]['io'].DefineVariable('time', cls.Timers[name]['diff'], [size], [rank], [1])
+                cls.Timers[name]['engine'] = cls.Timers[name]['io'].Open(timefile, adios2.Mode.Write, comm)
+
+            else:
+                cls.Wtime = time.time
+                cls.Timers[name]['io'].DefineVariable('time', cls.Timers[name]['diff'], [1], [0], [1])
+                cls.Timers[name]['engine'] = cls.Timers[name]['io'].Open(timefile, adios2.Mode.Write)
+
+        cls.Timers[name]['start'] = cls.Wtime()
+
+
+    @classmethod
+    def stop_timer(cls, name):
+        if (name in cls.Timers) and ('start' in cls.Timers[name].keys()):
+            if ('stop' not in cls.Timers[name].keys()) or (cls.Timers[name]['start'] > cls.Timers[name]['stop']):
+                cls.Timers[name]['stop'] = cls.Wtime()
+                var = cls.Timers[name]['io'].InquireVariable('time')
+                cls.Timers[name]['diff'][0] = cls.Timers[name]['stop'] - cls.Timers[name]['start']
+                cls.Timers[name]['engine'].BeginStep()
+                cls.Timers[name]['engine'].Put(var, cls.Timers[name]['diff'])
+                cls.Timers[name]['engine'].EndStep()
+                cls.Timers[name]['start'] = cls.Timers[name]['stop']
+            else:
+                warnings.warn("Found stop without matching start for timer {0}".format(name), RuntimeWarning)
+
+        else:
+            warnings.warn("Found stop without matching start for timer {0}".format(name), RuntimeWarning)
 
 
 def TimingRead(filename, comm=None):

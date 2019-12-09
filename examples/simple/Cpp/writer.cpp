@@ -58,6 +58,8 @@ int main(int argc, char **argv)
 
     for (int j=0; j<10; j++)
 	{
+        //@effis-timer start="LoopTimer", comm=comm
+		
 		for (int i=0; i<nelems; i++)
 		{
 			RandomInts[i] = rand() % 1000;
@@ -67,6 +69,8 @@ int main(int argc, char **argv)
         engine.Put(vKnownInts,  KnownInts);
         engine.Put(vRandomInts, RandomInts);
         engine.EndStep();
+
+        //@effis-timer stop="LoopTimer"
 	}
 
     engine.Close();

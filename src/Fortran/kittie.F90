@@ -46,6 +46,13 @@ module kittie
 	integer, dimension(:), allocatable ::  nparams!, nplots,
 
 
+	integer :: ntimers=0
+	character(len=128), dimension(:), allocatable :: timers
+	type(adios2_io), dimension(:), allocatable :: timer_ios
+	type(adios2_engine), dimension(:), allocatable :: timer_engines
+	real(8), dimension(:), allocatable :: start_times, stop_times
+
+
 	integer :: kittie_comm, kittie_rank, kittie_StepNumber
 	real(8) :: kittie_StepPhysical
 	logical :: kittie_StepInit=.false.
@@ -64,6 +71,14 @@ module kittie
 			allocate(groupnames(ngroupnames), helpers(ngroupnames))
 			nGroupsSet = 0
 		end subroutine SetMaxGroups
+
+		subroutine SetMaxTimers(num)
+			integer, intent(in) :: num
+			!ntimers = num
+			allocate(timers(num), timer_ios(num), timer_engines(num), start_times(num), stop_times(num))
+			start_times(:) = -1
+			stop_times(:) = -1
+		end subroutine SetMaxTimers
 
 
 		subroutine kittie_read_codes_file(filename)
@@ -595,11 +610,11 @@ module kittie
 
 #		ifdef USE_MPI
 
-			subroutine kittie_initialize(comm, xml, ngroups, ierr)
+			subroutine kittie_initialize(comm, xml, ngroups, numtimers, ierr)
 				! Intialize Kittie's ADIOS-2 namespace
 				integer, intent(in)  :: comm
 				character(len=*), intent(in), optional :: xml
-				integer, intent(in), optional :: ngroups
+				integer, intent(in), optional :: ngroups, numtimers
 				integer, intent(out), optional :: ierr
 				integer :: iierr
 				character(len=10) :: num
@@ -608,6 +623,12 @@ module kittie
 					call SetMaxGroups(ngroups)
 				else
 					call SetMaxGroups(25)
+				end if
+
+				if (present(numtimers)) then
+					call SetMaxTimers(numtimers)
+				else
+					call SetMaxTimers(25)
 				end if
 
 				call mpi_comm_dup(comm, kittie_comm, iierr)
@@ -631,10 +652,10 @@ module kittie
 
 #		else
 
-			subroutine kittie_initialize(xml, ngroups, ierr)
+			subroutine kittie_initialize(xml, ngroups, numtimers, ierr)
 				! Intialize Kittie's ADIOS-2 namespace
 				character(len=*), intent(in), optional :: xml
-				integer, intent(in), optional :: ngroups
+				integer, intent(in), optional :: ngroups, numtimers
 				integer, intent(out), optional :: ierr
 				integer :: iierr
 				character(len=10) :: num
@@ -643,6 +664,12 @@ module kittie
 					call SetMaxGroups(ngroups)
 				else
 					call SetMaxGroups(25)
+				end if
+
+				if (present(numtimers)) then
+					call SetMaxTimers(numtimers)
+				else
+					call SetMaxTimers(25)
 				end if
 
 				kittie_rank = 0
@@ -933,6 +960,93 @@ module kittie
 
 			end if
 		end subroutine write_step
+
+
+		subroutine start_timer(tname, comm)
+			character(len=*), intent(in) :: tname
+			integer, intent(in), optional :: comm
+			integer :: i, ierr, rank, procs
+			logical :: found
+			character(len=256) :: timefile
+			type(adios2_variable) :: varid
+			integer(8), dimension(1) :: tdims, toffs, tlocs
+
+#			ifndef USE_MPI
+				write(0, "Need MPI to use EFFIS timers from Fortan")
+
+#			else
+				found = .false.
+
+				do i=1, ntimers
+					if (trim(timers(i)) == trim(tname)) then
+						found = .true.
+						exit
+					end if
+				end do
+				
+				if (.not.found) then
+					ntimers = ntimers + 1
+					timers(ntimers) = trim(tname)
+					i = ntimers
+
+					timefile = trim(timingdir) // '/' // trim(tname) // '.bp'
+					call adios2_declare_io(timer_ios(i), kittie_adios, trim(timers(i)), ierr)
+
+					if (present(comm)) then
+						call mpi_comm_rank(comm, rank, ierr)
+						call mpi_comm_size(comm, procs, ierr)
+						tdims(1) = procs
+						toffs(1) = rank
+						tlocs(1) = 1
+						call adios2_define_variable(varid, timer_ios(i), "time", adios2_type_dp, 1, tdims, toffs, tlocs, .true., ierr)
+						call adios2_open(timer_engines(i), timer_ios(i), trim(timefile), adios2_mode_write, comm, ierr)
+					else
+						call mpi_comm_rank(kittie_comm, rank, ierr)
+						call mpi_comm_size(kittie_comm, procs, ierr)
+						tdims(1) = procs
+						toffs(1) = rank
+						tlocs(1) = 1
+						call adios2_define_variable(varid, timer_ios(i), "time", adios2_type_dp, 1, tdims, toffs, tlocs, .true., ierr)
+						call adios2_open(timer_engines(i), timer_ios(i), trim(timefile), adios2_mode_write, kittie_comm, ierr)
+					end if
+				end if
+
+				start_times(i) = mpi_wtime()
+#			endif
+
+		end subroutine start_timer
+
+
+		subroutine stop_timer(tname)
+			character(len=*), intent(in) :: tname
+			integer :: i, ierr
+			logical :: found
+
+#			ifndef USE_MPI
+				write(0, "Need MPI to use EFFIS timers from Fortan")
+
+#			else
+				found = .false.
+				do i=1, ntimers
+					if (trim(timers(i)) == trim(tname)) then
+						found = .true.
+						exit
+					end if
+				end do
+				
+				if (.not.found .or. (start_times(i) <= stop_times(i))) then
+					write(0, "('Found stop without matching start for timer ', A)") trim(tname)
+				else
+					stop_times(i) = mpi_wtime()
+					call adios2_begin_step(timer_engines(i), adios2_step_mode_append, ierr)
+					call adios2_put(timer_engines(i), "time", (/stop_times(i) - start_times(i)/), ierr)
+					call adios2_end_step(timer_engines(i), ierr)
+					start_times(i) = stop_times(i)
+				end if
+#			endif
+
+		end subroutine stop_timer
+
 
 end module kittie
 

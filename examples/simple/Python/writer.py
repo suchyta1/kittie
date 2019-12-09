@@ -70,6 +70,8 @@ if __name__ == "__main__":
 
 
     for i in range(10):
+        #@effis-timer start="LoopTimer", comm=comm
+
         RandomInts = np.random.randint(0, 1000, size=nelems, dtype=np.int64)
         RandomInts2 = np.random.randint(0, 1000, size=nelems, dtype=np.int64)
         #@effis-timestep physical=i*0.01, number=i
@@ -82,6 +84,8 @@ if __name__ == "__main__":
             engine.EndStep()
 
         time.sleep(1)
+
+        #@effis-timer stop="LoopTimer"
 
     engine.Close()
     #@effis-end

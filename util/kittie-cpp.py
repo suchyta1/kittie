@@ -128,11 +128,12 @@ class BlockFiles(object):
         self.files = []
 
         self.init = "@effis-init"
-        #self.initallowed = ["xml", "comm", "readid"]
         self.initallowed = ["xml", "comm"]
 
         self.final = "@effis-finalize"
         self.step  = "@effis-timestep"
+
+        self.timer = "@effis-timer"
 
 
     def Raise(self, msg, code=None):
@@ -552,6 +553,68 @@ class BlockFiles(object):
         return OutText
 
 
+    def AddTimer(self, TimerComp, FileText):
+        matched = False
+        while True:
+            TimerMatch = TimerComp.search(FileText)
+            OutText = FileText
+
+            if TimerMatch is not None:
+                matched = True
+                InnerText = FileText[TimerMatch.end():]
+                EndIndex = InnerText.find("\n")
+                line = InnerText[:EndIndex].strip()
+
+                CommText = None
+                CommMatch = None
+                comm1 = re.compile("(.*)comm\s*=\s*(.*),(.*)")
+                comm2 = re.compile("(.*)comm\s*=\s*(.*)")
+                match1 = comm1.search(line)
+                match2 = comm2.search(line)
+                if match1 is not None:
+                    CommMatch = match1
+                elif match2 is not None:
+                    CommMatch = match2
+                if CommMatch is not None:
+                    CommText = CommMatch.group(2)
+
+                StartMatch = None
+                start1 = re.compile("(.*)start\s*=\s*(.*),(.*)")
+                start2 = re.compile("(.*)start\s*=\s*(.*)")
+                match1 = start1.search(line)
+                match2 = start2.search(line)
+                if match1 is not None:
+                    StartMatch = match1
+                elif match2 is not None:
+                    StartMatch = match2
+                if StartMatch is not None:
+                    name = StartMatch.group(2)
+                    OutText = FileText[:TimerMatch.start()] + self.TimerStartText(name, CommText) + FileText[(TimerMatch.end()+EndIndex):]
+
+                #stop = re.compile("(.*)stop\s*=\s*(.*),*(.*)")
+                stop = re.compile("(.*)stop\s*=\s*(.*)")
+                StopMatch = stop.search(line)
+                if StopMatch is not None:
+                    name = StopMatch.group(2)
+                    OutText = FileText[:TimerMatch.start()] + self.TimerStopText(name) + FileText[(TimerMatch.end()+EndIndex):]
+
+                if (StartMatch is not None) and (StopMatch is not None):
+                    raise ValueError("Cannot give start and stop in same timer pragma")
+
+                if (StartMatch is None) and (StopMatch is None):
+                    raise ValueError("Must either start or stop timer")
+
+                if name not in self.timernames:
+                    self.timernames += [name]
+
+            else:
+                break
+
+            FileText = OutText
+
+        return OutText, matched
+
+
     def AddHeader(self, FileText):
         for expr in self.HeadExpr:
             if self.language == "fortran":
@@ -599,15 +662,19 @@ class BlockFiles(object):
         StepExpr  = "{0}{1}".format(self.ReComment, self.step)
         StartExpr = "{0}{1}".format(self.ReComment, self.begin)
         EndExpr   = "{0}{1}".format(self.ReComment, self.end)
+        TimerExpr = "{0}{1}".format(self.ReComment, self.timer)
 
         InitComp  = re.compile(InitExpr,  re.MULTILINE)
         FinalComp = re.compile(FinalExpr, re.MULTILINE)
         StepComp  = re.compile(StepExpr,  re.MULTILINE)
         StartComp = re.compile(StartExpr, re.MULTILINE)
         EndComp   = re.compile(EndExpr,   re.MULTILINE)
+        TimerComp = re.compile(TimerExpr, re.MULTILINE)
 
         InitFiles = []
         self.groupnames = []
+        self.timernames = []
+
         for filename in self.files:
             UpdatedPos = 0
             UpdatedText = ""
@@ -627,6 +694,9 @@ class BlockFiles(object):
 
             # Look for step
             FileText = self.AddStep(StepComp, FileText)
+
+            # Look for timer
+            FileText, FoundTimer = self.AddTimer(TimerComp, FileText)
 
 
             # Get the bounds of the replacement blocks
@@ -685,6 +755,7 @@ class BlockFiles(object):
                     NewText = infile.read()
                 # + 1 is in case we use AddStep
                 NewText = NewText.replace("$N_KITTIE_GROUPS$", "{0}".format(len(self.groupnames) + 1))
+                NewText = NewText.replace("$N_KITTIE_TIMERS$", "{0}".format(len(self.timernames) + 1))
                 with open(InitFile, 'w') as out:
                     out.write(NewText)
 
@@ -737,6 +808,15 @@ class CppBlocks(BlockFiles):
         if 'physical' not in kv:
             self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
         return "kittie::write_step({0}, {1});".format(kv['physical'], kv['number'])
+
+    def TimerStartText(self, name, CommText):
+        if CommText is not None:
+            return "kittie::start_timer({0}, {1});".format(name, CommText)
+        else:
+            return "kittie::start_timer({0});".format(name)
+
+    def TimerStopText(self, name):
+        return "kittie::stop_timer({0});".format(name)
 
     def DeclareText(self, args, IOName, IOobj=None):
         if IOobj is None:
@@ -825,7 +905,7 @@ class FortranBlocks(BlockFiles):
             args += [keydict['comm']]
         if 'xml' in keydict:
             args += [keydict['xml']]
-        return "call kittie_initialize({0}, ngroups=$N_KITTIE_GROUPS$)".format(', '.join(args))
+        return "call kittie_initialize({0}, ngroups=$N_KITTIE_GROUPS$, numtimers=$N_KITTIE_TIMERS$)".format(', '.join(args))
 
     def FinalText(self, closed=None):
         if closed is not None:
@@ -847,6 +927,15 @@ class FortranBlocks(BlockFiles):
         if 'physical' not in kv:
             self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
         return "call write_step({0}, {1})".format(kv['physical'], kv['number'])
+
+    def TimerStartText(self, name, CommText):
+        if CommText is not None:
+            return "call start_timer({0}, comm={1})".format(name, CommText)
+        else:
+            return "call start_timer({0})".format(name)
+
+    def TimerStopText(self, name):
+        return "call stop_timer({0})".format(name)
 
 
     def DeclareText(self, args, IOName, IOObj=None):
@@ -951,6 +1040,16 @@ class PythonBlocks(BlockFiles):
         if 'physical' not in kv:
             self.Raise("In file {0}, 'physical' is needed in {1}".format(self.TmpFilename, self.step), line)
         return "kittie.Kittie.write_step({0}, {1})".format(kv['physical'], kv['number'])
+
+    def TimerStartText(self, name, CommText):
+        if CommText is not None:
+            return "kittie.Kittie.start_timer({0}, comm={1})".format(name, CommText)
+        else:
+            return "kittie.Kittie.start_timer({0})".format(name)
+            
+    def TimerStopText(self, name):
+        return "kittie.Kittie.stop_timer({0})".format(name)
+
 
     def DeclareText(self, args, IOName, IOobj=None):
         if IOobj is None:

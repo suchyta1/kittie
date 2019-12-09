@@ -885,6 +885,7 @@ class KittieJob(cheetah.Campaign):
 
 
     def WriteGroupsFile(self):
+
         for k, codename in enumerate(self.codenames):
             if codename == "kittie-plotter":
                 continue
@@ -950,16 +951,14 @@ class KittieJob(cheetah.Campaign):
             plots_list = ["plots_list", '\n'.join(pstrs)]
             params_list = ["params_list", '\n'.join(params+values)]
             outstr = kittie_common.Namelist(names, names_list, plots_list, params_list)
-            #kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
             kittie_common.NMLFile("kittie-groups", self.mainpath, outstr, codename=codename, appname=k, launchmode=self.launchmode)
 
             if self.launchmode == "default":
                 outdir = os.path.join(self.mainpath, codename)
             else:
                 outdir = self.mainpath
-            #outstr = yaml.dump(dict(self.codesetup[codename]["groups"]), default_flow_style=False)
-            outstr = yaml.dump(self.codesetup[codename]["groups"], default_flow_style=False, Dumper=self.OrderedDumper)
-            #outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(self.codesetup[codename]['appname']))
+            self.codesetup[codename]['groups'][".timingdir"] = self.timingdir
+            outstr = yaml.dump(self.codesetup[codename]['groups'], default_flow_style=False, Dumper=self.OrderedDumper)
             outname = os.path.join(outdir, ".kittie-groups-{0}.yaml".format(k))
             with open(outname, "w") as outfile:
                 outfile.write(outstr)
@@ -978,7 +977,6 @@ class KittieJob(cheetah.Campaign):
             nlist = ["codes", nstrs]
             glist = ["codes_list", gstrs]
             outstr = kittie_common.Namelist(nlist, glist)
-            #kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=self.codesetup[codename]['appname'], launchmode=self.launchmode)
             kittie_common.NMLFile("kittie-codenames", self.mainpath, outstr, codename=codename, appname=i, launchmode=self.launchmode)
 
             if self.launchmode == "default":
@@ -987,7 +985,6 @@ class KittieJob(cheetah.Campaign):
                 outdir = self.mainpath
             outdict = {'n': len(self.codenames), 'codename': str(codename), 'codes': list(self.codenames)}
             outstr = yaml.dump(outdict, default_flow_style=False)
-            #outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(self.codesetup[codename]['appname']))
             outname = os.path.join(outdir, ".kittie-codenames-{0}.yaml".format(i))
             with open(outname, 'w') as outfile:
                 outfile.write(outstr)

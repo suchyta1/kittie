@@ -55,6 +55,9 @@ std::string kittie::StepGroupname;
 std::vector<std::string> kittie::StepGroups;
 
 
+std::map<std::string, kittie::Timer*> kittie::Timers;
+std::string kittie::timingdir;
+
 
 bool kittie::Exists(std::string filename)
 {
@@ -115,6 +118,8 @@ void kittie::_groupsyaml()
 	if(Exists(yamlfile))
 	{
 		groupsyaml = YAML::LoadFile(yamlfile);
+		kittie::timingdir = groupsyaml[".timingdir"].as<std::string>();
+		groupsyaml.remove(".timingdir");
 
 		for(YAML::const_iterator it=groupsyaml.begin(); it!=groupsyaml.end(); ++it)
 		{
@@ -742,4 +747,82 @@ void kittie::Coupler::close()
 		}
 	}
 }
+
+
+kittie::Timer::Timer()
+{
+	stop = -1;
+	start = -1;
+}
+
+
+#ifdef USE_MPI
+	void kittie::start_timer(std::string name, MPI_Comm comm)
+	{
+		std::string timefile;
+		int rank, size, ierr;
+		std::size_t tdims, toffs, tlocs;
+
+		bool found = (kittie::Timers.find(name) != kittie::Timers.end());
+		if (!found)
+		{
+			kittie::Timers.insert(std::make_pair(name, new kittie::Timer));
+		}
+
+		if (!found)
+		{
+			kittie::Timers[name]->io = kittie::adios->DeclareIO(name);
+			ierr = MPI_Comm_rank(comm, &rank);
+			ierr = MPI_Comm_size(comm, &size);
+			tdims = size;
+			toffs = rank;
+			tlocs = 1;
+			adios2::Variable<double> varid = kittie::Timers[name]->io.DefineVariable<double>("time", {tdims}, {toffs}, {tlocs}, adios2::ConstantDims);
+			timefile = kittie::timingdir + "/" + name + ".bp";
+			kittie::Timers[name]->engine = kittie::Timers[name]->io.Open(timefile, adios2::Mode::Write, comm);
+		}
+		kittie::Timers[name]->start = MPI_Wtime();
+	}
+#endif
+
+
+void kittie::start_timer(std::string name)
+{
+#	ifndef USE_MPI
+		std::cerr << "Need MPI to use EFFIS timers from C++" << std::endl;
+		return;
+#	endif
+		kittie::start_timer(name, kittie::comm);
+}
+
+
+void kittie::stop_timer(std::string name)
+{
+	double diff[1];
+	bool found = (kittie::Timers.find(name) != kittie::Timers.end());
+	if (found)
+	{
+		if (kittie::Timers[name]->start > kittie::Timers[name]->stop)
+		{
+			kittie::Timers[name]->stop = MPI_Wtime();
+			diff[0] = kittie::Timers[name]->stop - kittie::Timers[name]->start;
+			adios2::Variable<double> varid = kittie::Timers[name]->io.InquireVariable<double>("time");
+			kittie::Timers[name]->engine.BeginStep();
+			kittie::Timers[name]->engine.Put(varid, diff);
+			kittie::Timers[name]->engine.EndStep();
+			kittie::Timers[name]->start = kittie::Timers[name]->stop;
+		}
+		else
+		{
+			std::cerr << "Found stop without matching start for timer " + name << std::endl;
+		}
+
+	}
+
+	else
+	{
+		std::cerr << "Found stop without matching start for timer " + name << std::endl;
+	}
+}
+	
 
