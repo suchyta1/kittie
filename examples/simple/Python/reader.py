@@ -21,21 +21,21 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
 
-    #@effis-begin "Jabberwocky"->"Jaberwocky"
+    #@effis-begin "Jabberwocky"->"Jabberwocky"
     reader_io = ad.DeclareIO("Jabberwocky")
     #@effis-end
 
     if mpi.UseComm:
-        #@effis-begin reader_io-->"Jaberwocky"
+        #@effis-begin reader_io-->"Jabberwocky"
         reader = reader_io.Open("Jabberwocky.bp", adios2.Mode.Read, comm)
         #@effis-end
     else:
-        #@effis-begin reader_io-->"Jaberwocky"
+        #@effis-begin reader_io-->"Jabberwocky"
         reader = reader_io.Open("Jabberwocky.bp", adios2.Mode.Read)
         #@effis-end
 
 
-    #@effis-begin reader--->"Jaberwocky"
+    #@effis-begin reader--->"Jabberwocky"
     while True:
 
         status = reader.BeginStep(kittie.Kittie.ReadStepMode, 10.0)

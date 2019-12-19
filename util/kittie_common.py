@@ -26,3 +26,4 @@ def NMLFile(name, mainpath, outstr, codename=None, appname=None, launchmode=None
         outname = os.path.join(outdir, ".{0}-{1}.nml".format(name, appname))
     with open(outname, 'w') as out:
         out.write(outstr)
+

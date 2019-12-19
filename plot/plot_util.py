@@ -9,26 +9,6 @@ import sys
 import time
 
 
-def GetType(varid):
-    size = varid.Sizeof()
-    kind = varid.Type()
-
-    # I'm just handling the common ones for now
-    if kind.find('int') != -1:
-        if size == 8:
-            UserType = np.int64
-        elif size == 4:
-            UserType = np.int32
-        elif size == 2:
-            UserType = np.int16
-    elif kind.find('double') != -1:
-        UserType = np.float64
-    elif (kind.find('float') != -1) or (kind.find('single') != -1):
-        UserType = np.float32
-
-    return UserType
-
-
 def ShapeParse(xShape, xsel):
     counts = np.array(xShape, dtype=np.int64)
     starts = np.zeros(counts.shape[0], dtype=np.int64)
@@ -80,7 +60,7 @@ class KittiePlotter(object):
         shape = vx.Shape()
         if len(shape) == 0:
             raise ValueError("Using this with a scalar for the x-axis doesn't makes sense")
-        self.DimInfo['xType'] = GetType(vx)
+        self.DimInfo['xType'] = kittie.GetType(vx)
 
         variables = self.io.AvailableVariables()
         if len(only) == 0:
@@ -100,7 +80,7 @@ class KittiePlotter(object):
             if shape == TestShape:
                 i = index % size
                 self.DimInfo['UserMatches'][i] += [name]
-                dtype = GetType(varid)
+                dtype = kittie.GetType(varid)
                 self.DimInfo['UserTypes'][i] += [dtype]
                 index += 1
 
@@ -142,12 +122,12 @@ class KittiePlotter(object):
             varid = self.io.InquireVariable(name)
             if name == xname:
                 xShape = varid.Shape()
-                xtype = GetType(varid)
+                xtype = kittie.GetType(varid)
                 self.DimInfo['xname'] = xname
                 self.DimInfo['xType'] = xtype
             else:
                 yShape = varid.Shape()
-                ytype = GetType(varid)
+                ytype = kittie.GetType(varid)
                 self.DimInfo['UserMatches'][i] += [name]
                 self.DimInfo['UserTypes'][i] += [ytype]
             index += 1
