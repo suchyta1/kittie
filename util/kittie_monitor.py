@@ -11,7 +11,6 @@ if 'ADIOS' in os.environ:
     sys.path.insert(0, os.environ['ADIOS'])
 
 import adios2
-import kittie_common
 import numpy as np
 
 
@@ -112,7 +111,7 @@ class UserMonitor(object):
                     for varname in self.IOSetups[groupname].variables:
                         varid = self.IOSetups[groupname].io.InquireVariable(varname)
                         shape = varid.Shape()
-                        dtype = kittie.GetType(varid)
+                        dtype = kittie.kittie_common.GetType(varid)
                         self.IOSetups[groupname].data[varname] = np.zeros(tuple(shape), dtype=dtype)
                         starts = np.zeros(len(shape), dtype=np.int64)
                         counts = np.array(shape, dtype=np.int64)
@@ -161,8 +160,8 @@ class UserMonitor(object):
 
                     if arg.startswith(code) or arg.startswith('{' + code + '}'):
                         special = True
-                        code, arg = kittie.DotSplit(arg)
-                        groupname, varname = kittie.DotSplit(arg)
+                        code, arg = kittie.kittie_common.DotSplit(arg)
+                        groupname, varname = kittie.kittie_common.DotSplit(arg)
                         filename = MonitorGlobal.setup[code][groupname]['filename']
 
                         SetupName = "{0}-{1}".format(code, groupname)

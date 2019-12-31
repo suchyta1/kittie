@@ -17,6 +17,7 @@ if __name__ == "__main__":
         description="WDM coupling framework",
         license = "GPL",
         packages=['kittie'],
+        zip_safe=False,
         author="Eric Suchyta",
         author_email="eric.d.suchyta@gmail.com"
     )
