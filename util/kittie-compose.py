@@ -68,7 +68,7 @@ class KittieJob(cheetah.Campaign):
         for key in config.keys():
             self.keywords[key] = config[key]
 
-        for name in ['args', 'options', 'path', 'filename', 'engine', 'params', 'processes', 'processes-per-node']:
+        for name in ['args', 'options', 'path', 'filename', 'engine', 'params', 'processes', 'processes-per-node', 'node-share']:
             if name not in self.keywords.keys():
                 self.keywords[name] = name
 
@@ -666,6 +666,9 @@ class KittieJob(cheetah.Campaign):
                 self.monitors['groups'][cname] = self.codesetup[cname]['groups']
 
 
+        SharedNodes = {}
+        added = []
+
         for k, codename in enumerate(self.codenames):
             codedict = {}
             codedict['exe'] = self.codesetup[codename][self.keywords['path']]
@@ -683,21 +686,56 @@ class KittieJob(cheetah.Campaign):
 
 
             # Set the node layout -- namely, it's different on summit
+            entry = self.codesetup[codename]
+            ns = self.keywords['node-share']
+            cpp = 1
+            if 'cpus-per-process' in entry:
+                cpp = entry['cpus-per-process']
+
             if self.machine == 'summit':
-                self.node_layout[self.machine] += [SummitNode()]
 
-                for i in range(self.codesetup[codename]['processes-per-node']):
-                    if 'cpus-per-process' in self.codesetup[codename]:
-                        for j in range(self.codesetup[codename]['cpus-per-process']):
-                            self.node_layout[self.machine][-1].cpu[i*self.codesetup[codename]['cpus-per-process'] + j] = "{0}:{1}".format(codename, i)
+                if ns not in entry:
+                    self.node_layout[self.machine] += [SummitNode()]
+                    added += [codename]
+                    index = -1
+                    CPUstart = 0
+
+                else:
+                    found = False
+                    for cname in entry[ns]:
+                        print("codename: {0},  cname: {1},  SharedNodes: {2}".format(codename, cname, SharedNodes))
+                        if cname in SharedNodes:
+                            found = True
+                            break
+
+                    if found:
+                        for i, name in enumerate(added):
+                            if name == cname:
+                                index = i
+                                break
+                        CPUstart = SharedNodes[cname]
+
                     else:
-                        self.node_layout[self.machine][-1].cpu[i] = "{0}:{1}".format(codename, i)
+                        cname = codename
+                        index = -1
+                        added += [codename]
+                        CPUstart = 0
+                        self.node_layout[self.machine] += [SummitNode()]
 
-                    if ('use-gpus' in self.codesetup[codename]) and self.codesetup[codename]['use-gpus']:
-                        self.node_layout[self.machine][-1].gpu[i] = ["{0}:{1}".format(codename, i)]
+                    SharedNodes[cname] = CPUstart + entry['processes-per-node'] * cpp
+
+
+                for i in range(entry['processes-per-node']):
+                    for j in range(cpp):
+                        self.node_layout[self.machine][index].cpu[CPUstart + i*cpp + j] = "{0}:{1}".format(codename, i)
+                        print(index, "{0}:{1}".format(codename, i))
+
+                    # This isn't exactly right yet
+                    if ('use-gpus' in entry) and entry['use-gpus']:
+                        self.node_layout[self.machine][index].gpu[i] = ["{0}:{1}".format(codename, i)]
 
             else:
-                self.node_layout[self.machine] += [{codename: self.codesetup[codename]['processes-per-node']}]
+                self.node_layout[self.machine] += [{codename: entry['processes-per-node']}]
 
 
             # Set the command line arguments

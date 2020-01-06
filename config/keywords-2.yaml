@@ -29,6 +29,7 @@ mpmd: mpmd
 script: script
 login-proc: login-proc
 timed: timed
+node-share: node-share
 
 
 path: executable_path

@@ -5,6 +5,7 @@ import random
 import numpy as np
 import time
 import sys
+import socket
 
 class mpi:
     UseComm = True
@@ -14,6 +15,7 @@ if mpi.UseComm:
 
 
 if __name__ == "__main__":
+    print(socket.gethostname())
     nelems = 10
 
     if mpi.UseComm:
