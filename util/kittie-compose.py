@@ -68,7 +68,7 @@ class KittieJob(cheetah.Campaign):
         for key in config.keys():
             self.keywords[key] = config[key]
 
-        for name in ['args', 'options', 'path', 'filename', 'engine', 'params', 'processes', 'processes-per-node', 'node-share']:
+        for name in ['args', 'options', 'path', 'filename', 'engine', 'params', 'processes', 'processes-per-node', 'node-share', 'share-nodes']:
             if name not in self.keywords.keys():
                 self.keywords[name] = name
 
@@ -147,6 +147,7 @@ class KittieJob(cheetah.Campaign):
 
         self._SetIfNotFound(self.config, 'jobname', 'kittie-job', level=logging.INFO)
         self._SetIfNotFound(self.config, 'mpmd', False, level=logging.INFO)
+        self._SetIfNotFound(self.config, 'share-nodes', [], level=logging.INFO)
 
         self._SetIfNotFound(self.config['machine'], 'job_setup', value=None, level=logging.INFO)
         self._SetIfNotFound(self.config['machine'], 'submit_setup', value=None, level=logging.INFO)
@@ -688,13 +689,15 @@ class KittieJob(cheetah.Campaign):
             # Set the node layout -- namely, it's different on summit
             entry = self.codesetup[codename]
             ns = self.keywords['node-share']
+            sn = self.keywords['share-nodes']
             cpp = 1
             if 'cpus-per-process' in entry:
                 cpp = entry['cpus-per-process']
 
             if self.machine == 'summit':
 
-                if ns not in entry:
+                #if ns not in entry:
+                if len(self.config[sn]) == 0:
                     self.node_layout[self.machine] += [SummitNode()]
                     added += [codename]
                     index = -1
@@ -702,6 +705,27 @@ class KittieJob(cheetah.Campaign):
 
                 else:
                     found = False
+                    for group in self.config[sn]:
+                        cname = group[0]
+                        if (codename in group) and (cname in SharedNodes):
+                            found = True
+                            break
+                    if found:
+                        for i, name in enumerate(added):
+                            if name == cname:
+                                index = i
+                                break
+                        CPUstart = SharedNodes[cname]
+                    else:
+                        cname = codename
+                        index = -1
+                        added += [codename]
+                        CPUstart = 0
+                        self.node_layout[self.machine] += [SummitNode()]
+                    SharedNodes[cname] = CPUstart + entry['processes-per-node'] * cpp
+
+
+                    """
                     for cname in entry[ns]:
                         print("codename: {0},  cname: {1},  SharedNodes: {2}".format(codename, cname, SharedNodes))
                         if cname in SharedNodes:
@@ -723,6 +747,7 @@ class KittieJob(cheetah.Campaign):
                         self.node_layout[self.machine] += [SummitNode()]
 
                     SharedNodes[cname] = CPUstart + entry['processes-per-node'] * cpp
+                    """
 
 
                 for i in range(entry['processes-per-node']):
