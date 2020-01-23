@@ -20,11 +20,12 @@ set_property(CACHE PYTHON_PREFIX PROPERTY STRINGS "ON;TRUE;OFF;FALSE")
 find_package(ADIOS2 REQUIRED)
 find_package(Yamlcpp REQUIRED)
 
-if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
-	find_package(PythonInterp REQUIRED)
-else()
-	find_package(Python REQUIRED)
-endif()
+find_package(PythonInterp REQUIRED)
+#if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
+#	find_package(PythonInterp REQUIRED)
+#else()
+#	find_package(Python REQUIRED)
+#endif()
 
 
 # Test Fortran compiler
