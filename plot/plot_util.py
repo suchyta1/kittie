@@ -7,6 +7,7 @@ import adios2
 
 import sys
 import time
+import kittie_common
 
 
 def ShapeParse(xShape, xsel):
@@ -60,7 +61,7 @@ class KittiePlotter(object):
         shape = vx.Shape()
         if len(shape) == 0:
             raise ValueError("Using this with a scalar for the x-axis doesn't makes sense")
-        self.DimInfo['xType'] = kittie.GetType(vx)
+        self.DimInfo['xType'] = kittie_common.GetType(vx)
 
         variables = self.io.AvailableVariables()
         if len(only) == 0:
@@ -80,7 +81,7 @@ class KittiePlotter(object):
             if shape == TestShape:
                 i = index % size
                 self.DimInfo['UserMatches'][i] += [name]
-                dtype = kittie.GetType(varid)
+                dtype = kittie_common.GetType(varid)
                 self.DimInfo['UserTypes'][i] += [dtype]
                 index += 1
 
@@ -122,12 +123,12 @@ class KittiePlotter(object):
             varid = self.io.InquireVariable(name)
             if name == xname:
                 xShape = varid.Shape()
-                xtype = kittie.GetType(varid)
+                xtype = kittie_common.GetType(varid)
                 self.DimInfo['xname'] = xname
                 self.DimInfo['xType'] = xtype
             else:
                 yShape = varid.Shape()
-                ytype = kittie.GetType(varid)
+                ytype = kittie_common.GetType(varid)
                 self.DimInfo['UserMatches'][i] += [name]
                 self.DimInfo['UserTypes'][i] += [ytype]
             index += 1
