@@ -8,6 +8,7 @@ import os
 import sys
 import numpy as np
 import plot_util
+import kittie_common
 
 # I'm going to require MPI with this, it's more or less required to do anything else real
 from mpi4py import MPI
@@ -65,14 +66,14 @@ def ReadMesh(nodesname, triname, griddata={}):
     engine.BeginStep()
 
     NodesVar = io.InquireVariable(nodesname)
-    dtype = plot_util.GetType(NodesVar)
+    dtype = kittie_common.GetType(NodesVar)
     dims = NodesVar.Shape()
     griddata[nodesname] = np.zeros(tuple(dims), dtype=dtype)
     NodesVar.SetSelection([[0]*len(dims), list(dims)])
     engine.Get(NodesVar, griddata[nodesname])
 
     TriVar = io.InquireVariable(triname)
-    dtype = plot_util.GetType(TriVar)
+    dtype = kittie_common.GetType(TriVar)
     dims = TriVar.Shape()
     griddata[triname] = np.zeros(tuple(dims), dtype=dtype)
     TriVar.SetSelection([[0]*len(dims), list(dims)])
