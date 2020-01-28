@@ -95,12 +95,18 @@ def ParseArgs():
     parser.add_argument("-e", "--exclude",  help="Don't plot the given y-values", type=str, default=[])
     parser.add_argument("-c", "--colormap", help="Colormap to use", type=str, default="bwr")
     parser.add_argument("-n", "--nlevels",  help="Number of color levels", type=int, default=40)
+    parser.add_argument("-d", "--use-dashboard", help="Using dashboard", type=str, default="off")
     args = parser.parse_args()
 
     if len(args.only) > 0:
         args.only = args.only.split(',')
     if len(args.exclude) > 0:
         args.exclude = args.exclude.split(',')
+
+    if args.use_dashboard.lower() in ["on", "yes", "true"]:
+        args.use_dashboard = True
+    else:
+        args.use_dashboard = False
 
     return args
 
@@ -113,13 +119,11 @@ if __name__ == "__main__":
 
     #@effis-init comm=comm
     adios = adios2.ADIOS(comm)
-    plotter = plot_util.KittiePlotter(comm)
-    print('A'); sys.stdout.flush()
+    plotter = plot_util.KittiePlotter(comm, on=args.use_dashboard)
     plotter.ConnectToStepInfo(adios, group="plotter")
-    print('B'); sys.stdout.flush()
     plotter.GetMatchingSelections(adios, args.gridvar, exclude=args.exclude, only=args.only, xomit=False, allx=False)
-    print('C'); sys.stdout.flush()
 
+    print('C'); sys.stdout.flush()
     plotter.data = ReadMesh(args.nodes, args.triangles, griddata=plotter.data)
     print('D'); sys.stdout.flush()
 
@@ -127,12 +131,10 @@ if __name__ == "__main__":
 
         while plotter.NotDone:
 
-            print('E'); sys.stdout.flush()
             if plotter.DoPlot:
                 plotter.GetPlotData()
                 Plot(plotter.data, args.nodes, args.triangles, plotter.outdir, xname="r", yname="z", cmap=args.colormap, nlevels=args.nlevels, minmax=True)
                 plotter.StepDone()
-            print('F'); sys.stdout.flush()
 
     #@effis-finalize
 
