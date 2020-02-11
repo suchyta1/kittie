@@ -60,6 +60,20 @@ def Plotly(data, xname, outdir):
         with open(output_file, 'w') as f:
             json.dump(result, f)
 
+def StepFile(data, outdir):
+
+    #output_file = os.path.join(outdir, "{0}".format(data['_StepNumber'][0]))
+
+    with adios2.open(outdir, 'w') as f:
+        for name in data.keys():
+            if name in ['_StepPhysical', '_StepNumber', 'minmax']:
+                continue
+            array = data[name]
+            shape = list(array.shape)
+            count = [array.size]
+            start = [] if shape == [] else [0]
+            f.write(name, array, shape, start, count)
+
 def ParseArgs():
     # Args are maybe just better in the dictionary
     parser = argparse.ArgumentParser()
