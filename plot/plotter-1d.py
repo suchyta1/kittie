@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import json
 
 
 def Plot(data, xname, outdir, fs=20):
@@ -37,6 +38,27 @@ def Plot(data, xname, outdir, fs=20):
         fig.savefig(os.path.join(outdir, "{0}_vs_{1}-{2}.svg".format(name.replace('/', '|'), xname.replace('/', '|'), data['_StepNumber'][0])), bbox_inches="tight")
         plt.close(fig)
 
+def Plotly(data, xname, outdir):
+
+    for name in data.keys():
+        if name in ['_StepPhysical', '_StepNumber', xname, 'minmax']:
+            continue
+
+        result = {
+            'data': [{'mode': 'line', 'type': 'scatter', 'x': data[xname].tolist(), 'y': data[name].tolist()}],
+            'layout': {
+                'title': '{1},  time = {0:.1e}'.format(data['_StepPhysical'][0], name),
+                'autosize': 'true', 'hovermode': 'closest',
+                'xaxis': {'type': 'linear', 'range': 'auto', 'title': str(xname), 'autorange': 'false'},
+                'yaxis': {'type': 'linear', 'range': 'auto', 'title': str(name), 'autorange': 'false'},
+            }, 'frames': []
+        }
+
+        output_file = os.path.join(
+            outdir, "{0}_vs_{1}-{2}.json".format(name.replace('/', '|'), xname.replace('/', '|'), data['_StepNumber'][0]))
+
+        with open(output_file, 'w') as f:
+            json.dump(result, f)
 
 def ParseArgs():
     # Args are maybe just better in the dictionary
