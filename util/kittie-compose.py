@@ -524,6 +524,8 @@ class KittieJob(cheetah.Campaign):
                     self.codesetup[codename][self.keywords['args']] += [self.codesetup[codename]['x']]
                 if "y" in self.codesetup[codename]:
                     self.codesetup[codename][self.keywords['options']]['y'] = self.codesetup[codename]['y']
+		if "output" in self.codesetup[codename]:
+                    self.codesetup[codename][self.keywords['options']]['out'] = self.codesetup[codename]['output']
                 if "data" in self.codesetup[codename]:
                     self.codesetup[codename]['.plotter'] = {'plots': self.codesetup[codename]["data"]}
 

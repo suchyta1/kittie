@@ -82,6 +82,7 @@ def ParseArgs():
     parser.add_argument("-e", "--exclude", help="Don't plot the given y-values", type=str, default=[])
     parser.add_argument("-y", "--y", help="How to generate Y-value(s)", type=str, default="match-dimensions")
     parser.add_argument("-d", "--use-dashboard", help="Using dashboard", type=str, default="off")
+    parser.add_argument("-out", "--output", help="Which output format to provide", type=str, default="plot")
     args = parser.parse_args()
 
     if len(args.only) > 0:
@@ -115,8 +116,12 @@ if __name__ == "__main__":
 
             if plotter.DoPlot:
                 plotter.GetPlotData(y=args.y)
-                Plot(plotter.data, plotter.DimInfo['xname'], plotter.outdir)
+                if args.output and args.output.lower() == 'bp':
+                    StepFile(plotter.data, plotter.outdir)
+                elif args.output and args.output.lower() == 'plotly':
+                    Plotly(plotter.data, plotter.DimInfo['xname'], plotter.outdir)
+                elif not args.output or args.output.lower() == 'matplot':
+                    Plot(plotter.data, plotter.DimInfo['xname'], plotter.outdir)
                 plotter.StepDone()
 
     #@effis-finalize
-
