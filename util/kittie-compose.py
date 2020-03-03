@@ -801,7 +801,10 @@ class KittieJob(cheetah.Campaign):
 
 
         # A sweep encompasses is a set of parameters that can vary. In my case nothing is varying, and the only sweep paramter is a single number of processes
-        sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
+        if self.machine in ['summit', 'theta', 'cori']:
+            sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
+        else:
+            sweep = cheetah.parameters.Sweep(sweepargs)
 
         # A sweepgroup runs a sweep by submiting a single job. There could be more than one sweepgroup, given by the sweeps list attribute, which would submit mutliple inpedent jobs.
         sweepgroup = cheetah.parameters.SweepGroup(self.groupname, walltime=self.config[self.keywords['walltime']], parameter_groups=[sweep], component_subdirs=subdirs, launch_mode=self.launchmode)
