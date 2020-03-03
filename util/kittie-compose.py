@@ -804,6 +804,7 @@ class KittieJob(cheetah.Campaign):
         if self.machine in ['summit', 'theta', 'cori']:
             sweep = cheetah.parameters.Sweep(sweepargs, node_layout=self.node_layout)
         else:
+            print("No node_layout")
             sweep = cheetah.parameters.Sweep(sweepargs)
 
         # A sweepgroup runs a sweep by submiting a single job. There could be more than one sweepgroup, given by the sweeps list attribute, which would submit mutliple inpedent jobs.
