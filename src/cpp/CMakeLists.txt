@@ -14,7 +14,7 @@ target_link_libraries(kittie PRIVATE adios2::adios2 yaml::cpp)
 target_include_directories(kittie 
 	PUBLIC 
 	$<BUILD_INTERFACE:${YAML_INCLUDE_DIRS}>
-	$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/cpp>
+	$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/src/cpp>
 	$<INSTALL_INTERFACE:${YAML_INCLUDE_DIRS}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
 )
