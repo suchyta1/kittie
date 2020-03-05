@@ -1,0 +1,28 @@
+jobname: simple
+rundir: runs/run-1
+
+machine:
+  name: local
+
+
+run:
+
+  writer:
+    processes: 1
+    processes-per-node: 1
+    executable_path: writer
+    .Jabberwocky:
+      output_path: test-file.bp
+      adios_engine: BP4
+
+  reader:
+    processes: 1
+    processes-per-node: 1
+    executable_path: reader
+    .Jabberwocky:
+      reads: writer.Jabberwocky
+
+  plot-colormap:
+    data: writer.Jabberwocky
+    only: RandomReals
+    colortype: Blues
