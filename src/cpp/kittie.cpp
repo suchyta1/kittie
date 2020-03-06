@@ -546,7 +546,7 @@ void kittie::Coupler::WaitDataExistence()
 	bool wait = (std::find(kittie::_MetaMethods.begin(), kittie::_MetaMethods.end(), EngineType) != kittie::_MetaMethods.end());
 	if (wait)
 	{
-		while (! kittie::Exists(filename))
+		while (! kittie::Exists(filename + "/md.idx"))
 		{
 			continue;
 		}
