@@ -22,3 +22,4 @@ install(
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/example.yaml DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/mixed)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/writer.F90 DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/mixed)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/reader.cpp DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/mixed)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/simple/mixed)
