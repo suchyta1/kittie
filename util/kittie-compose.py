@@ -497,6 +497,9 @@ class KittieJob(cheetah.Campaign):
             thisdir = os.path.dirname(os.path.realpath(__file__))
             updir = os.path.dirname(thisdir)
 
+            if (codename == "plot-triangular"):
+                self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-2d-triangular.py")
+
             if (codename == "plot-colormap"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-2d.py")
                 if "only" in self.codesetup[codename]:
