@@ -520,6 +520,7 @@ class KittieJob(cheetah.Campaign):
 
             if (codename == "plot-1D"):
                 self.codesetup[codename][self.keywords['path']] = os.path.join(updir, "plot", "plotter-1d.py")
+                self.codesetup[codename][self.keywords['options']]['output'] = 'matplot'
                 if "x" in self.codesetup[codename]:
                     self.codesetup[codename][self.keywords['args']] += [self.codesetup[codename]['x']]
                 if "y" in self.codesetup[codename]:
